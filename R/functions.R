@@ -1,0 +1,63 @@
+# Copyright 2020 Province of British Columbia
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and limitations under the License.
+
+
+
+get_climate_data <- function(ids, data_dir = "data/weather", interval = "day") {
+  if(!dir.exists(data_dir)) dir.create(data_dir)
+
+  potential_paths <- file.path(data_dir, ids)
+  needed_stations <- ids[!dir.exists(potential_paths)]
+
+  message(paste0(length(needed_stations),
+                 " of ",
+                 length(potential_paths),
+                 " stations need to be downloaded"))
+
+  purrr::walk(needed_stations, ~{
+    d <- weather_dl(.x, interval = interval)
+    if (!dir.exists(file.path(data_dir, .x))) dir.create(file.path(data_dir, .x))
+    write_parquet(d, sink = file.path(data_dir, .x, "data.parquet"))
+    rm(d)
+    gc()
+  })
+
+  invisible(TRUE)
+}
+
+get_normals_data <- function(climate_ids, normals_years = "1981-2010", data_dir = "data/normals") {
+
+  parquet_dir <- file.path(data_dir, "normals.parquet")
+  if (!dir.exists(data_dir)) dir.create(data_dir)
+
+  if (file.exists(parquet_dir)) {
+    existing_normals <- arrow::read_parquet(parquet_dir)
+    not_present_ids <- setdiff(climate_ids, unique(existing_normals$climate_id))
+
+  }
+
+  if (purrr::is_empty(not_present_ids)) return(invisible(TRUE))
+
+    n <- normals_dl(climate_ids = not_present_ids, normals_years = normals_years) %>%
+        dplyr::select(-frost) %>%
+        tidyr::unnest(cols = c(normals))
+
+    n <- dplyr::bind_rows(existing_normals, n)
+    arrow::write_parquet(n, sink = parquet_dir)
+}
+
+
+
+
+
+
+
