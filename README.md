@@ -3,6 +3,9 @@
 climate-disturbances
 ============================
 
+### Usage
+Run `targets::tar_make()` to run project.
+
 
 ### Project Status
 
