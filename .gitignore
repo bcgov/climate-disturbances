@@ -2,5 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
-
 *.parquet
+*.csv
+*.pptx
+*.html
+!pptx-template.pptx
+_targets
+data
