@@ -1,0 +1,45 @@
+---
+title: "LHA Assessment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tidyverse.quiet = TRUE)
+```
+
+The intent of this report is to capture figures and tables relating to familiarize ourselves with LHA's. 
+
+```{r}
+library(targets)
+
+tar_load(lha_popn)
+summary(lha_popn$Total)
+```
+
+## What are Local Health Areas?
+
+> The LHAs are a mutually exclusive and exhaustive classification of the land area in BC. LHAs are contiguous (land area is geographically adjacent) and fit within an existing geographical hierarchy structure, e.g., cannot violate higher-level geography boundaries such as the Health Service Delivery Areas (HSDA) and Health Authorities (HA).
+
+```{r, echo=FALSE}
+library(tmap)
+
+tm_shape(lha_popn) +
+  tm_polygons(col = "Total", style = "kmeans") +
+  tm_layout(title = "Local Health Area Population")
+
+```
+
+
+
+```{r}
+hist(lha_popn$Total)
+```
+
+
+
+## Heatwaves by LHA
+
+
+
+
