@@ -19,9 +19,18 @@ library(arrow)
 library(dplyr)
 library(weathercan) ## right now need to install dev version remotes::install_github("ropensci/weathercan", ref = "fix_normals")
 library(purrr)
+library(cancensus)
+library(readr)
+library(tidyr)
+library(bcmaps) ## dev version
+library(lubridate)
+library(sf)
+library(bcdata)
 
 ## Other scripts
 source("R/functions.R")
+
+walk(list.files("R/", pattern = "fn-", full.names = TRUE), source)
 
 
 
