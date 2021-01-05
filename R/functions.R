@@ -11,6 +11,7 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
+# Get Data ----------------------------------------------------------------
 
 get_climate_data <- function(ids, data_dir = "data/weather", interval = "day") {
   if(!dir.exists(data_dir)) dir.create(data_dir)
@@ -55,6 +56,47 @@ get_normals_data <- function(climate_ids, normals_years = "1981-2010", data_dir 
     arrow::write_parquet(n, sink = parquet_dir)
 }
 
+get_pm25_data <- function(...) {
+  databc_pm25 <- "ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv"
+  read_csv(databc_pm25,
+           col_types = cols_only(DATE_PST = col_datetime(),
+                                 EMS_ID = col_character(),
+                                 STATION_NAME = col_character(),
+                                 INSTRUMENT = col_character(),
+                                 RAW_VALUE = col_double()))
+}
+
+# Spatial -----------------------------------------------------------------
+
+
+stations_geo <- function(interval_var = 'day') {
+  stations %>%
+    filter(prov == "BC", interval == interval_var) %>%
+    st_as_sf(coords = c("lon", "lat"), crs = "+proj=longlat") %>%
+    transform_bc_albers()
+}
+
+
+
+# Health data -------------------------------------------------------------
+
+##  Return LHA population by year
+
+get_lha_popn <- function(year) {
+  health_lha() %>%
+    left_join(read_csv("data/demographics/lha_2010-2019-all-ages.csv") %>%
+                filter(Year %in% year) %>%
+                mutate(Region = as.character(Region)) %>%
+                select(Region:Total),
+              by = c("LOCAL_HLTH_AREA_CODE" = "Region", "LOCAL_HLTH_AREA_NAME" = "Local Health Area"))
+}
+
+
+get_lha_age <- function(year) {
+  read_csv("data/demographics/lha_2010-2019-all-ages.csv") %>%
+    filter(Year %in% year) %>%
+    pivot_longer(cols = c(`0`:`90+`), names_to = 'age', values_to = 'n')
+}
 
 
 
