@@ -63,13 +63,13 @@ get_pm25_data <- function(...) {
                                  EMS_ID = col_character(),
                                  STATION_NAME = col_character(),
                                  INSTRUMENT = col_character(),
-                                 RAW_VALUE = col_double()))
+                                 RAW_VALUE = col_double()),...)
 }
 
 # Spatial -----------------------------------------------------------------
 
 
-stations_geo <- function(interval_var = 'day') {
+weather_stations_geo <- function(interval_var = 'day') {
   stations %>%
     filter(prov == "BC", interval == interval_var) %>%
     st_as_sf(coords = c("lon", "lat"), crs = "+proj=longlat") %>%
