@@ -20,7 +20,7 @@ calc_heatwave_days_over_time <- function(..., geography_to_add = NULL) {
 
   if (!is.null(geography_to_add)) {
     h <- h %>%
-      left_join(stations_geo() %>%
+      left_join(weather_stations_geo() %>%
                   st_join(geography_to_add) %>%
                   st_drop_geometry())
   }
@@ -30,13 +30,20 @@ calc_heatwave_days_over_time <- function(..., geography_to_add = NULL) {
     filter(heatwave_flag == "heatwave")
 }
 
-calc_area_burned_over_time <- function() {
+calc_area_burned_over_time <- function(geography_to_add = NULL) {
   fires <- bcdc_query_geodata('22c7cb44-1463-48f7-8e47-88857f207702') %>%
-    head(100) %>%
     select(FIRE_YEAR, FIRE_SIZE_HECTARES) %>%
     collect()
 
 
+  if (!is.null(geography_to_add)) {
+    fires <- fires %>%
+      st_intersection(geography_to_add) %>%
+      st_drop_geometry() %>%
+      group_by(FIRE_YEAR, LOCAL_HLTH_AREA_NAME, HLTH_AUTHORITY_NAME) %>%
+      summarise(FIRE_SIZE_HECTARES = sum(FIRE_SIZE_HECTARES))
+    return(fires)
+  }
 
   fires %>%
     st_drop_geometry() %>%
