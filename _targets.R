@@ -26,7 +26,7 @@ tar_option_set(packages = .packages())
 
 ##  targets
 climate_targets <- list(
-  tar_target(stations_lha, stations_geo() %>%
+  tar_target(stations_lha, weather_stations_geo() %>%
                filter(prov == "BC", normals, end >= 2019) %>%
                st_join(health_lha())),
   tar_target(get_climate_data, get_climate_data(stations_lha$station_id)),
@@ -37,20 +37,21 @@ climate_targets <- list(
   tar_target(heatwave_days_over_time_by_lha, calc_heatwave_days_over_time(geography_to_add = health_lha()) %>%
                group_by(year, LOCAL_HLTH_AREA_NAME, HLTH_AUTHORITY_NAME) %>%
                summarise(heatwave_days_per_station = n()/n_distinct(station_id))),
-  tar_target(area_burned_over_time, calc_area_burned_over_time())
+  tar_target(area_burned_over_time, calc_area_burned_over_time()),
+  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(geography_to_add = health_lha()))
 )
 
 
 
-# lha_demographics <- list(
-#   tar_target(lha_popn, get_lha_popn(2019)),
-#   tar_target(lha_age, get_lha_age(2019))
-# )
+lha_demographics <- list(
+  tar_target(lha_popn, get_lha_popn(2019)),
+  tar_target(lha_age, get_lha_age(2019))
+)
 
 list(
   climate_targets,
+  lha_demographics,
   tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
-  #lha_demographics,
   #tar_render(lha_assessment, "out/lha_assessment.Rmd")
   )
 

@@ -1,5 +1,5 @@
 ---
-title: "Climate Distrubances Overview"
+title: "Climate Disturbances Overview"
 date: "`r Sys.Date()`"
 output: 
   officedown::rpptx_document:
@@ -21,6 +21,8 @@ library(tidyverse)
 library(flextable)
 library(extrafont)
 library(targets)
+library(DiagrammeR)
+library(tmap)
 
 
 # ## Flex table defaults
@@ -37,6 +39,7 @@ if(.Platform$OS.type == "windows"){
 theme_set(theme_minimal(base_family = "Calibri") %+replace%
             theme(plot.caption = element_text(face = "italic", hjust = 1),
                   plot.title.position = "plot",
+                  strip.text = element_text(size = 20),
                   panel.grid.major.x = element_blank(),
                   panel.grid.minor.x = element_blank(),
                   axis.title = element_text(size = 18),
@@ -44,14 +47,124 @@ theme_set(theme_minimal(base_family = "Calibri") %+replace%
           )
 ```
 
+
+## Overview
+```{r, fig.width=2, fig.height=2}
+grViz("
+digraph rmarkdown {
+graph [overlap = true, fontsize = 15]
+node [shape = box,
+      fontname = Calibri,
+      fontcolor = dodgerblue,
+      color = Grey]
+edge [color = dodgerblue]
+
+'Climate Related Disturbance' -> 'Services Used' -> 'Demographics of that Service Usage'
+}
+"
+)
+```
+
+
+## Overview
+```{r, fig.width=2, fig.height=2}
+grViz("
+digraph rmarkdown {
+graph [overlap = true, fontsize = 15]
+node [shape = box,
+      fontname = Calibri,
+      fontcolor = dodgerblue,
+      color = Grey]
+edge [color = dodgerblue ]
+
+'Climate Related Disturbance' -> 'Services Used' -> 'Demographics of that Service Usage'
+
+
+node [shape = circle,
+      fontname = Calibri,
+      fontcolor = MediumPurple,
+      color = Grey]
+
+{Space Time}
+}
+"
+)
+```
+
+
+## What is the spatial extent of the MVP?
+
+:::::::::::::: {.columns}
+::: {.column}
+```{r, fig.width=12, fig.height=12}
+tm_shape(tar_read(lha_popn)) +
+  tm_polygons(col = "Total", style = "kmeans") +
+  tm_layout(title = "Local Health Area Population", scale = 2)
+```
+:::
+::: {.column}
+- For MVP do we choose a subset of the province to compare?
+- Which spatial data is available?
+  - Local Health Area smallest geographic unit of most health data
+  - Census Subdivision corresponds to municipal boundaries and is a geography that people intuitively know
+:::
+::::::::::::::
+
+## Wildfires - Health Authority
+```{r}
+tar_read(area_burned_over_time_by_lha) %>% 
+  mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
+  ggplot(aes(x = FIRE_YEAR, y = FIRE_SIZE_SQKM, colour = LOCAL_HLTH_AREA_NAME)) +
+  geom_line() +
+  labs(y = "Area Burned (km^2)") +
+  guides(colour = FALSE) +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~HLTH_AUTHORITY_NAME)
+```
+
+
+
+## Temporal Considerations
+```{r, cache=TRUE}
+cum_area_burned <- bcdc_query_geodata('22c7cb44-1463-48f7-8e47-88857f207702') %>%
+  filter(FIRE_YEAR >= 2014) %>% 
+  select(FIRE_YEAR, FIRE_DATE, FIRE_SIZE_HECTARES) %>%
+  collect() %>% 
+  st_drop_geometry() %>% 
+  mutate(year = year(FIRE_DATE)) %>% 
+  group_by(year) %>% 
+  arrange(FIRE_DATE) %>% 
+  mutate(cum_burned = cumsum(FIRE_SIZE_HECTARES))
+  
+cum_area_burned %>% 
+  mutate(day_no_year = as.Date(paste('2010',month(FIRE_DATE), day(FIRE_DATE), sep = "-")), year = factor(year)) %>% 
+  ggplot() +
+  geom_line(aes(x = day_no_year, y = cum_burned, colour = year)) +
+  labs(y = "Cumulative Area Burned (hectares)") +
+  theme(axis.title.x = element_blank())
+```
+
+
+
+
+
 ## Which Climate Related Disturbance?
-- Wildfires
-- Heatwaves
-- Flooding
+
+### Wildfires
+
+- What is our measure? Air quality?
+
+### Heatwaves
+
+- How do we define extreme heat events?
+
+### Flooding
+
+- Complicated...
 
 
+## Wildfires - Provincial
 
-## Wildfires
 ```{r}
 tar_read(area_burned_over_time) %>% 
   mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
@@ -61,21 +174,12 @@ tar_read(area_burned_over_time) %>%
   theme(axis.title.x = element_blank())
 ```
 
-## Wildfires
 
-- Test
-- Test
 
-## Heatwaves - Provincial
-```{r}
-tar_read(heatwave_days_over_time) %>% 
-  mutate(year = as.numeric(year)) %>% 
-  filter(year > 1960) %>% 
-  ggplot(aes(x = year, y = heatwave_days_per_station)) +
-  geom_line() 
-```
 
-## Heatwaves - By LHA
+
+
+## Heatwaves - Health Authority
 ```{r}
 tar_read(heatwave_days_over_time_by_lha) %>% 
   mutate(year = as.numeric(year)) %>% 
@@ -85,5 +189,35 @@ tar_read(heatwave_days_over_time_by_lha) %>%
   geom_smooth() +
   guides(colour = FALSE) +
   facet_wrap(~HLTH_AUTHORITY_NAME)
+```
+
+## Service Usage
+```{r ft.left=2, ft.top=2}
+tribble(
+  ~Service, ~Data, ~Difficulty,
+  "Ambulance call outs", "NACRS", "Low",
+  "Hospital visits", "DAD", "Medium",
+  "Income Assistance", "BCEA", "Low",
+  "Doctor visits", "MSP Billing", "High"
+) %>% 
+  flextable() %>% 
+  autofit()
+```
+
+
+## Demographics/Economics
+- Intersectionality
+- GBA+ lens
+
+```{r ft.left=2, ft.top=4}
+tribble(
+  ~Variables, ~Data, ~`Data Location`,
+  "Gender", "Demographics", "DIP",
+  "Age", "Demographics/Census", "DIP/Open",
+  "Population", "Registry/Census", "DIP/Open",
+  "Income", "Census/Cancensus", "Open"
+) %>% 
+  flextable() %>% 
+  autofit()
 ```
 
