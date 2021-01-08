@@ -125,9 +125,17 @@ weather_stations_geo <- function(interval_var = 'day') {
 
 weather <- function(aoi, start_date = NULL, end_date = NULL, interval_var = 'day', ask = TRUE) {
 
+  search_int <- lubridate::interval(start_date, end_date)
+
   aoi <- bcmaps::transform_bc_albers(aoi)
 
   stations_in_aoi <- sf::st_filter(weather_stations_geo(interval_var = interval_var), aoi)
+
+  stations_in_aoi$station_int <- lubridate::interval(
+    as.Date(paste0(stations_in_aoi$start,"-01-01")),
+    as.Date(paste0(stations_in_aoi$end, "-12-31")))
+
+  stations_in_aoi <- filter(stations_in_aoi, int_overlaps(station_int, search_int))
 
   if (!get_climate_data(stations_in_aoi$station_id, ask = ask)) stop("Problems with downloading", call. = FALSE)
 
