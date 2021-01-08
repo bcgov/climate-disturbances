@@ -20,38 +20,42 @@ library(tarchetypes)
 source("R/setup.R")
 
 ## Load packages
-tar_option_set(packages = .packages())
+#tar_option_set(packages = .packages())
 
 
 
-##  targets
+# Load --------------------------------------------------------------------
+
+
+
+#  targets
 climate_targets <- list(
-  tar_target(stations_lha, weather_stations_geo() %>%
-               filter(prov == "BC", normals, end >= 2019) %>%
-               st_join(health_lha())),
-  tar_target(get_climate_data, get_climate_data(stations_lha$station_id)),
-  tar_target(pm25_data, get_pm25_data()),
-  tar_target(heatwave_days_over_time, calc_heatwave_days_over_time() %>%
-               group_by(year) %>%
-               summarise(heatwave_days_per_station = n()/n_distinct(station_id))),
-  tar_target(heatwave_days_over_time_by_lha, calc_heatwave_days_over_time(geography_to_add = health_lha()) %>%
-               group_by(year, LOCAL_HLTH_AREA_NAME, HLTH_AUTHORITY_NAME) %>%
-               summarise(heatwave_days_per_station = n()/n_distinct(station_id))),
-  tar_target(area_burned_over_time, calc_area_burned_over_time()),
-  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(geography_to_add = health_lha()))
+  tar_target(lha_with_income, health_lha() %>%
+               st_filter(
+                 get_census('TX2018',
+                            regions=list(CMA="59"),
+                            use_cache = FALSE,
+                            geo_format = 'sf',
+                            level=c("CT"),
+                            quiet = TRUE) %>%
+                   transform_bc_albers()
+                 ) %>%
+               select(LOCAL_HLTH_AREA_NAME, LOCAL_HLTH_AREA_CODE)),
+  tar_target(pm25_data, pm25(lha_with_income, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"))),
+  tar_target(weather, weather(lha_with_income, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"), ask = FALSE))
 )
 
 
 
-lha_demographics <- list(
-  tar_target(lha_popn, get_lha_popn(2019)),
-  tar_target(lha_age, get_lha_age(2019))
-)
+# lha_demographics <- list(
+#   tar_target(lha_popn, get_lha_popn(2019)),
+#   tar_target(lha_age, get_lha_age(2019))
+# )
 
 list(
-  climate_targets,
-  lha_demographics,
-  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
+  climate_targets#,
+  #lha_demographics,
+  #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
   #tar_render(lha_assessment, "out/lha_assessment.Rmd")
   )
 
