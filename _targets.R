@@ -30,19 +30,10 @@ source("R/setup.R")
 
 #  targets
 climate_targets <- list(
-  tar_target(lha_with_income, health_lha() %>%
-               st_filter(
-                 get_census('TX2018',
-                            regions=list(CMA="59"),
-                            use_cache = FALSE,
-                            geo_format = 'sf',
-                            level=c("CT"),
-                            quiet = TRUE) %>%
-                   transform_bc_albers()
-                 ) %>%
-               select(LOCAL_HLTH_AREA_NAME, LOCAL_HLTH_AREA_CODE)),
-  tar_target(pm25_data, pm25(lha_with_income, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"))),
-  tar_target(weather, weather(lha_with_income, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"), ask = FALSE))
+  tar_target(lha_in_census_tract, health_lha() %>%
+               st_filter(census_tract())),
+  tar_target(pm25_data, pm25(lha_in_census_tract, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"))),
+  tar_target(weather_data, weather(lha_in_census_tract, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"), ask = FALSE))
 )
 
 
