@@ -141,13 +141,18 @@ weather <- function(aoi, start_date = NULL, end_date = NULL, interval_var = 'day
 
   d <- arrow::open_dataset(here::here("data/weather/"), partitioning = "station_idtemp")
 
-  if (!is.null(start_date)) d <- filter(d, date >= as.Date(start_date))
-  if (!is.null(end_date)) d <- filter(d, date <= as.Date(end_date))
   if (!is.null(aoi)) d <- filter(d, station_idtemp %in% stations_in_aoi$station_id)
 
-  d %>%
+  d <- d %>%
     select(-station_idtemp) %>%
     collect()
+
+  ## Date filtering not working with arrow right now. MVP.
+  if (!is.null(end_date)) d <- filter(d, date <= end_date)
+  if (!is.null(start_date)) d <- filter(d, date >= start_date)
+
+  d
+
 }
 
 
