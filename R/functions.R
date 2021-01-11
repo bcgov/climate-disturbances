@@ -48,7 +48,7 @@ air_quality_stations_geo <- function() {
 
 }
 
-pm25 <- function(aoi=NULL, start_date = NULL, end_date = NULL) {
+pm25 <- function(aoi=NULL, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL) {
   aoi <- bcmaps::transform_bc_albers(aoi)
   stations_in_aoi <- sf::st_filter(air_quality_stations_geo(), aoi)
   d <- get_pm25_data()
@@ -57,8 +57,17 @@ pm25 <- function(aoi=NULL, start_date = NULL, end_date = NULL) {
   if (!is.null(start_date)) d <- filter(d, DATE_PST >= start_date)
   if (!is.null(end_date)) d <- filter(d, DATE_PST <= end_date)
 
-  d %>%
+  d <- d %>%
     collect()
+
+  if(add_aoi_attributes) {
+    geo_attr <- st_join(select(stations_in_aoi, EMS_ID), aoi)
+    geo_attr <- st_drop_geometry(geo_attr)
+
+    d <- d %>% left_join(geo_attr)
+  }
+
+  d
 }
 
 
@@ -123,7 +132,7 @@ weather_stations_geo <- function(interval_var = 'day') {
 }
 
 
-weather <- function(aoi, start_date = NULL, end_date = NULL, interval_var = 'day', ask = TRUE) {
+weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL, interval_var = 'day', ask = TRUE) {
 
   search_int <- lubridate::interval(start_date, end_date)
 
@@ -150,6 +159,13 @@ weather <- function(aoi, start_date = NULL, end_date = NULL, interval_var = 'day
   ## Date filtering not working with arrow right now. MVP.
   if (!is.null(end_date)) d <- filter(d, date <= end_date)
   if (!is.null(start_date)) d <- filter(d, date >= start_date)
+
+  if(add_aoi_attributes) {
+    geo_attr <- st_join(select(stations_in_aoi, station_id), aoi)
+    geo_attr <- st_drop_geometry(geo_attr)
+
+    d <- d %>% left_join(geo_attr)
+  }
 
   d
 
