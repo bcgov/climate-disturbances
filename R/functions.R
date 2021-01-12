@@ -14,6 +14,8 @@
 
 # Air Quality -------------------------------------------------------------
 
+##
+
 
 get_pm25_data <- function(...) {
   pm25_link <- "ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv"
@@ -172,26 +174,6 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
 }
 
 
-
-# Health data -------------------------------------------------------------
-
-##  Return LHA population by year
-
-get_lha_popn <- function(year) {
-  health_lha() %>%
-    left_join(read_csv("data/demographics/lha_2010-2019-all-ages.csv") %>%
-                filter(Year %in% year) %>%
-                mutate(Region = as.character(Region)) %>%
-                select(Region:Total),
-              by = c("LOCAL_HLTH_AREA_CODE" = "Region", "LOCAL_HLTH_AREA_NAME" = "Local Health Area"))
-}
-
-
-get_lha_age <- function(year) {
-  read_csv("data/demographics/lha_2010-2019-all-ages.csv") %>%
-    filter(Year %in% year) %>%
-    pivot_longer(cols = c(`0`:`90+`), names_to = 'age', values_to = 'n')
-}
 
 
 

@@ -25,29 +25,45 @@ source("R/setup.R")
 
 
 # Load --------------------------------------------------------------------
-
+# time variables
+time_vars <- list(
+  tar_target(start_date, as.Date('2017-01-01')),
+  tar_target(end_date, as.Date('2018-12-31'))
+)
 
 
 #  targets
 climate_targets <- list(
-  tar_target(lha_in_census_tract, health_lha() %>%
+  tar_target(lha_of_interest, health_lha() %>%
                st_filter(census_tract())),
-  tar_target(pm25_data, pm25(lha_in_census_tract, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"))),
-  tar_target(weather_data, weather(lha_in_census_tract, start_date = as.Date('2017-01-01'), end_date = as.Date("2018-12-31"), ask = FALSE))
+  tar_target(pm25_data, pm25(lha_of_interest, start_date = start_date, end_date = end_date)),
+  tar_target(weather_data, weather(lha_of_interest, start_date = start_date, end_date = end_date, ask = FALSE))
+)
+
+
+# processing
+
+processing_targets <- list(
+  tar_target(pm25_24h, pm25_data %>%
+               rename(date_time = date_pst) %>%
+               distinct() %>%
+               pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
 )
 
 
 
-# lha_demographics <- list(
-#   tar_target(lha_popn, get_lha_popn(2019)),
-#   tar_target(lha_age, get_lha_age(2019))
-# )
+lha_demographics <- list(
+  tar_target(lha_popn, get_lha_popn(2019) %>% st_filter(lha_of_interest)),
+  tar_target(lha_age, get_lha_age(2019) %>% filter(Region %in% lha_of_interest$LOCAL_HLTH_AREA_CODE))
+)
 
 list(
-  climate_targets#,
-  #lha_demographics,
+  time_vars,
+  climate_targets,
+  processing_targets,
+  lha_demographics,
   #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
-  #tar_render(lha_assessment, "out/lha_assessment.Rmd")
+  tar_render(lha_assessment, "out/lha_assessment.Rmd")
   )
 
 
