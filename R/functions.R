@@ -41,7 +41,7 @@ get_pm25_data <- function(...) {
 air_quality_stations_geo <- function() {
   aq_stations_link <- "ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/Air_Monitoring_Stations/bc_air_monitoring_stations.csv"
 
-  aq_stations <- readr::read_csv(aq_stations_link, col_types = c("cccddcdddccccDD"))
+  aq_stations <- readr::read_csv(aq_stations_link, col_types = c("cccddcdddccccDD"), na = c("", "N/A"))
   aq_stations <- dplyr::filter(aq_stations, !is.na(LONG), !is.na(LAT))
   aq_stations <- sf::st_as_sf(aq_stations, coords = c("LONG", "LAT"), crs = "+proj=longlat")
   bcmaps::transform_bc_albers(aq_stations)
@@ -67,7 +67,7 @@ pm25 <- function(aoi=NULL, add_aoi_attributes = TRUE, start_date = NULL, end_dat
     d <- d %>% left_join(geo_attr)
   }
 
-  d
+  janitor::clean_names(d)
 }
 
 
@@ -167,7 +167,7 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
     d <- d %>% left_join(geo_attr)
   }
 
-  d
+  janitor::clean_names(d)
 
 }
 
