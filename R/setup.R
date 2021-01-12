@@ -26,12 +26,13 @@ library(bcmaps) ## dev version
 library(lubridate)
 library(sf)
 library(bcdata)
+library(rcaaqs)
 
 ## Other scripts
 source("R/utils.R")
 source("R/functions.R")
 source("R/fn-disturbance-defn.R")
-#source("R/fn-demographics.R")
+source("R/fn-demographics.R")
 
 
 
