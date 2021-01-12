@@ -20,39 +20,50 @@ library(tarchetypes)
 source("R/setup.R")
 
 ## Load packages
-tar_option_set(packages = .packages())
+#tar_option_set(packages = .packages())
 
 
 
-##  targets
+# Load --------------------------------------------------------------------
+# time variables
+time_vars <- list(
+  tar_target(start_date, as.Date('2017-01-01')),
+  tar_target(end_date, as.Date('2018-12-31'))
+)
+
+
+#  targets
 climate_targets <- list(
-  tar_target(stations_lha, weather_stations_geo() %>%
-               filter(prov == "BC", normals, end >= 2019) %>%
-               st_join(health_lha())),
-  tar_target(get_climate_data, get_climate_data(stations_lha$station_id)),
-  tar_target(pm25_data, get_pm25_data()),
-  tar_target(heatwave_days_over_time, calc_heatwave_days_over_time() %>%
-               group_by(year) %>%
-               summarise(heatwave_days_per_station = n()/n_distinct(station_id))),
-  tar_target(heatwave_days_over_time_by_lha, calc_heatwave_days_over_time(geography_to_add = health_lha()) %>%
-               group_by(year, LOCAL_HLTH_AREA_NAME, HLTH_AUTHORITY_NAME) %>%
-               summarise(heatwave_days_per_station = n()/n_distinct(station_id))),
-  tar_target(area_burned_over_time, calc_area_burned_over_time()),
-  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(geography_to_add = health_lha()))
+  tar_target(lha_of_interest, health_lha() %>%
+               st_filter(census_tract())),
+  tar_target(pm25_data, pm25(lha_of_interest, start_date = start_date, end_date = end_date)),
+  tar_target(weather_data, weather(lha_of_interest, start_date = start_date, end_date = end_date, ask = FALSE))
+)
+
+
+# processing
+
+processing_targets <- list(
+  tar_target(pm25_24h, pm25_data %>%
+               rename(date_time = date_pst) %>%
+               distinct() %>%
+               pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
 )
 
 
 
 lha_demographics <- list(
-  tar_target(lha_popn, get_lha_popn(2019)),
-  tar_target(lha_age, get_lha_age(2019))
+  tar_target(lha_popn, get_lha_popn(2019) %>% st_filter(lha_of_interest)),
+  tar_target(lha_age, get_lha_age(2019) %>% filter(Region %in% lha_of_interest$LOCAL_HLTH_AREA_CODE))
 )
 
 list(
+  time_vars,
   climate_targets,
+  processing_targets,
   lha_demographics,
-  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
-  #tar_render(lha_assessment, "out/lha_assessment.Rmd")
+  #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
+  tar_render(lha_assessment, "out/lha_assessment.Rmd")
   )
 
 

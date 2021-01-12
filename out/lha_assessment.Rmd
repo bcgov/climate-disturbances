@@ -4,7 +4,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE,
+                      warning = FALSE, fig.width=12, 
+                      fig.height=10)
 options(tidyverse.quiet = TRUE)
 ```
 
@@ -12,6 +15,8 @@ The intent of this report is to capture figures and tables relating to familiari
 
 ```{r}
 library(targets)
+library(bcmaps)
+library(ggplot2)
 
 tar_load(lha_popn)
 summary(lha_popn$Total)
@@ -24,21 +29,37 @@ summary(lha_popn$Total)
 ```{r, echo=FALSE}
 library(tmap)
 
-tm_shape(lha_popn) +
+tm_shape(bc_neighbours()) +
+  tm_polygons(col = "white") +
+  tm_shape(lha_popn) +
   tm_polygons(col = "Total", style = "kmeans") +
   tm_layout(title = "Local Health Area Population")
 
 ```
 
 
-
+## Air Quality by Health Service Delivery Area
 ```{r}
-hist(lha_popn$Total)
+tar_read(pm25_24h)$daily_avg %>% 
+  ggplot(aes(date, y = avg_24h, colour = station_name)) +
+  geom_line() +
+  guides(colour=FALSE) +
+  labs(y = "Daily PM 2.5 value", x = "Date") +
+  facet_wrap(~hlth_service_dlvr_area_name) +
+  theme(legend.position = "bottom")
 ```
 
+## Daily Temperature by Health Service Delivery Area
+```{r}
+tar_read(weather_data) %>% 
+  ggplot(aes(date, y = mean_temp, colour = station_name)) +
+  geom_line() +
+  guides(colour=FALSE) +
+  labs(y = "Mean Daily Temperature", x = "Date") +
+  facet_wrap(~hlth_service_dlvr_area_name) +
+  theme(legend.position = "bottom")
 
-
-## Heatwaves by LHA
+```
 
 
 

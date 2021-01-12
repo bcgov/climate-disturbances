@@ -6,6 +6,24 @@ climate-disturbances
 ### Usage
 Run `targets::tar_make()` to run project.
 
+### Environmental Data Functions
+
+All environmental data functions have some of common parameters:
+
+- `aoi`: a spatial boundary that is an {sf} object
+- `add_aoi_attributes`: a logical argument that asks whether you want to carry over the attributes from the aoi
+- `start_date`: a date of date object (via `as.Date`)
+- `end_date`: a date of date object (via `as.Date`)
+
+
+
+### Air Quality
+
+The air quality data are sourced from this file: ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv
+
+Using the method implemented in `rcaaqs::pm_24h_caaqs()`, data were aggregated to a daily average. 
+
+
 
 ### Project Status
 

@@ -1,4 +1,4 @@
-# Copyright 2020 Province of British Columbia
+# Copyright 2021 Province of British Columbia
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,31 +12,8 @@
 
 
 
-
-## Packages
-
-library(arrow)
-library(dplyr)
-library(weathercan) ## right now need to install dev version remotes::install_github("ropensci/weathercan", ref = "fix_normals")
-library(purrr)
-library(cancensus)
-library(readr)
-library(tidyr)
-library(bcmaps) ## dev version
-library(lubridate)
-library(sf)
-library(bcdata)
-library(rcaaqs)
-
-## Other scripts
-source("R/utils.R")
-source("R/functions.R")
-source("R/fn-disturbance-defn.R")
-source("R/fn-demographics.R")
-
-
-
-
-
-
-
+ask <- function(...) {
+  choices <- c("Yes", "No")
+  cat(paste0(..., collapse = ""))
+  utils::menu(choices) == which(choices == "Yes")
+}
