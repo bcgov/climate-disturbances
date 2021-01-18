@@ -27,8 +27,8 @@ source("R/setup.R")
 # Load --------------------------------------------------------------------
 # time variables
 time_vars <- list(
-  tar_target(start_date, as.Date('2017-01-01')),
-  tar_target(end_date, as.Date('2018-12-31'))
+  tar_target(start_date, as.Date('1981-01-01')),
+  tar_target(end_date, as.Date('2020-12-31'))
 )
 
 
@@ -37,7 +37,7 @@ climate_targets <- list(
   tar_target(lha_of_interest, health_lha() %>%
                st_filter(census_tract())),
   tar_target(pm25_data, pm25(lha_of_interest, start_date = start_date, end_date = end_date)),
-  tar_target(weather_data, weather(lha_of_interest, start_date = start_date, end_date = end_date, ask = FALSE))
+  tar_target(weather_data, weather(lha_of_interest, start_date = start_date, end_date = end_date, normals = TRUE, ask = FALSE))
 )
 
 
@@ -47,7 +47,9 @@ processing_targets <- list(
   tar_target(pm25_24h, pm25_data %>%
                rename(date_time = date_pst) %>%
                distinct() %>%
-               pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
+               pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name"))),
+  tar_target(heatwaves_raw, detect_heatwave(weather_data, pctile = 90)),
+  tar_target(heatwaves, bind_heatwave_data(heatwaves_raw))
 )
 
 
@@ -56,6 +58,7 @@ lha_demographics <- list(
   tar_target(lha_popn, get_lha_popn(2019) %>% st_filter(lha_of_interest)),
   tar_target(lha_age, get_lha_age(2019) %>% filter(Region %in% lha_of_interest$LOCAL_HLTH_AREA_CODE))
 )
+
 
 list(
   time_vars,
