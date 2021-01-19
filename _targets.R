@@ -20,7 +20,7 @@ library(tarchetypes)
 source("R/setup.R")
 
 ## Load packages
-#tar_option_set(packages = .packages())
+tar_option_set(packages = .packages())
 
 
 
@@ -32,19 +32,23 @@ time_vars <- list(
 )
 
 
-#  targets
+#  climate data
 climate_targets <- list(
-  tar_target(lha_of_interest, health_lha() %>%
-               st_filter(census_tract())),
-  tar_target(pm25_data, pm25(lha_of_interest, start_date = start_date, end_date = end_date)),
-  tar_target(weather_data, weather(lha_of_interest, start_date = start_date, end_date = end_date, normals = TRUE, ask = FALSE)),
+tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
+tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
+tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, ask = FALSE)),
   tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(lha_of_interest)),
   tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
 )
 
+# demographics
+lha_demographics <- list(
+  tar_target(lha_popn, get_lha_popn(2019) %>% st_filter(area_of_interest)),
+  tar_target(lha_age, get_lha_age(2019) %>% filter(Region %in% area_of_interest$LOCAL_HLTH_AREA_CODE))
+)
+# tidy --------------------------------------------------------------------
 
 # processing
-
 processing_targets <- list(
   tar_target(pm25_24h, pm25_data %>%
                rename(date_time = date_pst) %>%
@@ -56,11 +60,10 @@ processing_targets <- list(
 
 
 
-lha_demographics <- list(
-  tar_target(lha_popn, get_lha_popn(2019) %>% st_filter(lha_of_interest)),
-  tar_target(lha_age, get_lha_age(2019) %>% filter(Region %in% lha_of_interest$LOCAL_HLTH_AREA_CODE))
-)
+# Output ------------------------------------------------------------------
 
+
+## Pipeline
 
 list(
   time_vars,
