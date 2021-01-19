@@ -23,6 +23,10 @@ library(extrafont)
 library(targets)
 library(DiagrammeR)
 library(tmap)
+library(sf)
+library(heatwaveR)
+library(bcdata)
+library(lubridate)
 
 
 # ## Flex table defaults
@@ -111,7 +115,7 @@ tm_shape(tar_read(lha_popn)) +
 ::::::::::::::
 
 ## Wildfires - Health Authority
-```{r}
+```{r, eval=FALSE}
 tar_read(area_burned_over_time_by_lha) %>% 
   mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
   ggplot(aes(x = FIRE_YEAR, y = FIRE_SIZE_SQKM, colour = LOCAL_HLTH_AREA_NAME)) +
@@ -154,20 +158,55 @@ cum_area_burned %>%
 
 - What is our measure? Air quality?
 
-### Heatwaves
-
-- How do we define extreme heat events?
+### Extreme Heat
 
 ### Flooding
 
-- Complicated...
+
+## Air Quality by Health Service Delivery Area
+```{r}
+tar_load(pm25_24h)
+
+pm25_24h$daily_avg %>% 
+  ggplot(aes(date, y = avg_24h, colour = station_name)) +
+  geom_line() +
+  guides(colour=FALSE) +
+  labs(y = "Daily PM 2.5 value", x = "Date") +
+  facet_wrap(~hlth_service_dlvr_area_name) +
+  theme(legend.position = "bottom")
+```
+
+## Heatwaves
+
+```{r}
+tar_load(heatwaves_raw)
+
+heatwaves_raw[["208"]] %>% 
+  event_line(min_duration = 2)
+```
+
+
+## River Level
+
+```{r}
+tar_load(flood_example)
+
+flood_example %>% 
+  filter(Date >= as.Date('2010-01-01')) %>% 
+  ggplot(aes(x = Date, y = Value)) +
+  geom_line()
+  
+```
+
 
 
 ## Wildfires - Provincial
 
 ```{r}
-tar_read(area_burned_over_time) %>% 
+tar_read(area_burned_over_time_by_lha) %>% 
   mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
+  group_by(FIRE_YEAR) %>% 
+  summarise(FIRE_SIZE_SQKM = sum(FIRE_SIZE_SQKM)) %>% 
   ggplot(aes(x = FIRE_YEAR, y = FIRE_SIZE_SQKM)) +
   geom_line() +
   labs(y = "Area Burned (km^2)") +
@@ -180,7 +219,7 @@ tar_read(area_burned_over_time) %>%
 
 
 ## Heatwaves - Health Authority
-```{r}
+```{r, eval=FALSE}
 tar_read(heatwave_days_over_time_by_lha) %>% 
   mutate(year = as.numeric(year)) %>% 
   filter(year > 1960) %>% 

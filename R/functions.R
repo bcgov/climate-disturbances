@@ -111,14 +111,25 @@ weather_stations_geo <- function(interval_var = 'day') {
   bcmaps::transform_bc_albers(stations)
 }
 
+normals_stations_geo <- function() {
+   dplyr::filter(stations, normals, prov == "BC", interval == "day")
+}
 
-weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL, interval_var = 'day', ask = TRUE) {
+
+
+
+weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL, interval_var = 'day', normals, ask = TRUE) {
 
   search_int <- lubridate::interval(start_date, end_date)
 
   aoi <- bcmaps::transform_bc_albers(aoi)
 
-  stations_in_aoi <- sf::st_filter(weather_stations_geo(interval_var = interval_var), aoi)
+  if (normals) {
+    stations_in_aoi <- sf::st_filter(weather_stations_geo(interval_var = interval_var), aoi) %>%
+      filter(normals)
+  } else {
+    stations_in_aoi <- sf::st_filter(weather_stations_geo(interval_var = interval_var), aoi)
+  }
 
   stations_in_aoi$station_int <- lubridate::interval(
     as.Date(paste0(stations_in_aoi$start,"-01-01")),

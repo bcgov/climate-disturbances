@@ -22,11 +22,12 @@ library(purrr)
 library(cancensus)
 library(readr)
 library(tidyr)
-library(bcmaps) ## dev version
 library(lubridate)
 library(sf)
+library(bcmaps) ## dev version
 library(bcdata)
 library(rcaaqs)
+library(tidyhydat)
 
 ## Other scripts
 source("R/utils.R")

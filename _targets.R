@@ -27,17 +27,18 @@ tar_option_set(packages = .packages())
 # Load --------------------------------------------------------------------
 # time variables
 time_vars <- list(
-  tar_target(start_date, as.Date('2010-01-01')),
-  tar_target(end_date, as.Date('2018-12-31'))
+  tar_target(start_date, as.Date('1981-01-01')),
+  tar_target(end_date, as.Date('2020-12-31'))
 )
 
 
 #  climate data
 climate_targets <- list(
-  tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
-  tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
-  tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, ask = FALSE)),
-  tar_target(normals_data, normals(area_of_interest))
+tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
+tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
+tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, ask = FALSE)),
+  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(lha_of_interest)),
+  tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
 )
 
 # demographics
@@ -52,28 +53,25 @@ processing_targets <- list(
   tar_target(pm25_24h, pm25_data %>%
                rename(date_time = date_pst) %>%
                distinct() %>%
-               pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
+               pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name"))),
+  tar_target(heatwaves_raw, detect_heatwave(weather_data, pctile = 95)),
+  tar_target(heatwaves, bind_heatwave_data(heatwaves_raw))
 )
 
 
 
 # Output ------------------------------------------------------------------
 
-outputs <- list(
-  #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
-  tar_render(lha_assessment, "out/lha_assessment.Rmd")
-)
-
-
-
 
 ## Pipeline
+
 list(
   time_vars,
   climate_targets,
   processing_targets,
   lha_demographics,
-  outputs
+  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
+  tar_render(lha_assessment, "out/lha_assessment.Rmd")
   )
 
 
