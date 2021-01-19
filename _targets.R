@@ -34,10 +34,10 @@ time_vars <- list(
 
 #  climate data
 climate_targets <- list(
-tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
-tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
-tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, ask = FALSE)),
-  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(lha_of_interest)),
+  tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
+  tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
+  tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = TRUE, ask = FALSE)),
+  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(area_of_interest)),
   tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
 )
 
