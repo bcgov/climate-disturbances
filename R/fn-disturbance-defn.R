@@ -14,57 +14,6 @@
 
 # Heatwave ----------------------------------------------------------------
 
-
-# heatwave_weather, open_dataset(here::here("data/weather/")) %>%
-#   filter(year > 1985, station_id %in% stations_lha$station_id) %>%
-#   select(station_id, station_name, date, year, month, max_temp, mean_temp) %>%
-#   group_by(station_id, station_name) %>%
-#   collect() %>%
-#   add_heatwave_flag()
-
-
-calc_heatwave_days_over_time <- function(..., geography_to_add = NULL) {
-  h <- open_dataset(here::here("data/weather/")) %>%
-    select(station_id, station_name, date, year, month, max_temp, mean_temp) %>%
-    group_by(station_id, station_name, year) %>%
-    collect()
-
-  h <- add_heatwave_flag(h, ...)
-
-  if (!is.null(geography_to_add)) {
-    h <- h %>%
-      left_join(weather_stations_geo() %>%
-                  st_join(geography_to_add) %>%
-                  st_drop_geometry())
-  }
-
-
-  h %>%
-    filter(heatwave_flag == "heatwave")
-}
-
-calc_area_burned_over_time <- function(geography_to_add = NULL) {
-  fires <- bcdc_query_geodata('22c7cb44-1463-48f7-8e47-88857f207702') %>%
-    select(FIRE_YEAR, FIRE_SIZE_HECTARES) %>%
-    collect()
-
-
-  if (!is.null(geography_to_add)) {
-    fires <- fires %>%
-      st_intersection(geography_to_add) %>%
-      st_drop_geometry() %>%
-      group_by(FIRE_YEAR, LOCAL_HLTH_AREA_NAME, HLTH_AUTHORITY_NAME) %>%
-      summarise(FIRE_SIZE_HECTARES = sum(FIRE_SIZE_HECTARES))
-    return(fires)
-  }
-
-  fires %>%
-    st_drop_geometry() %>%
-    group_by(FIRE_YEAR) %>%
-    summarise(FIRE_SIZE_HECTARES = sum(FIRE_SIZE_HECTARES))
-}
-
-
 detect_heatwave <- function(.data, climatologyPeriod = c("1981-01-01", "2010-12-31"), pctile = 95, minDuration = 2) {
 
   ## make sure the numbers data is there for the climatogy period
@@ -101,6 +50,31 @@ bind_heatwave_data <- function(heatwaves) {
     event = purrr::map_df(names(heatwaves) %>% set_names(), ~heatwaves[[.x]]$event, .id = "station_id")
   )
 }
+
+
+calc_area_burned_over_time <- function(geography_to_add = NULL) {
+  fires <- bcdc_query_geodata('22c7cb44-1463-48f7-8e47-88857f207702') %>%
+    select(FIRE_YEAR, FIRE_SIZE_HECTARES) %>%
+    collect()
+
+
+  if (!is.null(geography_to_add)) {
+    fires <- fires %>%
+      st_intersection(geography_to_add) %>%
+      st_drop_geometry() %>%
+      group_by(FIRE_YEAR, LOCAL_HLTH_AREA_NAME, HLTH_AUTHORITY_NAME) %>%
+      summarise(FIRE_SIZE_HECTARES = sum(FIRE_SIZE_HECTARES))
+    return(fires)
+  }
+
+  fires %>%
+    st_drop_geometry() %>%
+    group_by(FIRE_YEAR) %>%
+    summarise(FIRE_SIZE_HECTARES = sum(FIRE_SIZE_HECTARES))
+}
+
+
+
 
 
 
