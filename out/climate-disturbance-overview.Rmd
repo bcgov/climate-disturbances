@@ -196,7 +196,8 @@ tribble(
   "Doctor visits", "MSP Billing", "Health",
   "Employment Training", "Labour Market", "AEST",
   "Support Services", "Children in Care",  "MCFD",
-  "Rental Supplements", "Rental Assistance", "BC Housing"
+  "Rental Supplements", "Rental Assistance", "BC Housing",
+  "Mental Health Episodes and Events", "Mental Health Services", "Health"
 ) %>% 
   flextable() %>% 
   autofit()
