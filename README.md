@@ -3,6 +3,17 @@
 climate-disturbances
 ============================
 
+### Installation
+
+The targets package needs to be installed at this time from GitHub using:
+
+```r
+library(remotes)
+install_github("ropensci/targets")
+```
+
+The packages used in this analysis are catalogued in the `R/setup.R`. It is likely that some of those packages won't be installed on your system. Those will need to be installed for this project to run.
+
 ### Usage
 Run `targets::tar_make()` to run project.
 
@@ -23,6 +34,13 @@ The air quality data are sourced from this file: ftp://ftp.env.gov.bc.ca/pub/out
 
 Using the method implemented in `rcaaqs::pm_24h_caaqs()`, data were aggregated to a daily average. 
 
+### Heatwaves
+
+Heatwave detection is implemented using data retrieved via the weathercan package and detected using the heatwaveR package
+
+### Floods
+
+Water level is retrieved from the HYDAT database using the tidyhydat package. 
 
 
 ### Project Status
