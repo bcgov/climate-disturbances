@@ -161,32 +161,3 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
   janitor::clean_names(d)
 
 }
-
-normals <- function(aoi, normals_years = "1981-2010", data_dir = "data/normals") {
-  normals_stations <- weather_stations_geo() %>%
-    dplyr::filter(normals) %>%
-    sf::st_filter(aoi)
-
-  parquet_dir <- file.path(data_dir, "normals.parquet")
-  if (!dir.exists(data_dir)) dir.create(data_dir)
-
-  if (file.exists(parquet_dir)) {
-    existing_normals <- arrow::read_parquet(parquet_dir)
-    not_present_ids <- setdiff(normals_stations$climate_id, unique(existing_normals$climate_id))
-    if (purrr::is_empty(not_present_ids)) return(existing_normals)
-
-    n <- weathercan::normals_dl(climate_ids = not_present_ids, normals_years = normals_years) %>%
-      dplyr::select(-frost) %>%
-      tidyr::unnest(cols = c(normals))
-
-    n <- dplyr::bind_rows(existing_normals, n)
-    n <- arrow::write_parquet(n, sink = parquet_dir)
-  } else {
-    n <- normals_dl(climate_ids = normals_stations$climate_id, normals_years = normals_years) %>%
-      dplyr::select(-frost) %>%
-      tidyr::unnest(cols = c(normals))
-    n <- arrow::write_parquet(n, sink = parquet_dir)
-  }
-
-  return(n)
-}

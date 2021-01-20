@@ -7,5 +7,7 @@
 *.pptx
 *.html
 !pptx-template.pptx
+!pptx-template-dpd.pptx
 _targets
 data
+img

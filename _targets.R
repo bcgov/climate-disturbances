@@ -37,18 +37,13 @@ climate_targets <- list(
   tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
   tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
   tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = TRUE, ask = FALSE)),
-  tar_target(area_burned_over_time_by_lha, calc_area_burned_over_time(area_of_interest)),
+  tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
   tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
 )
 
-# demographics
-lha_demographics <- list(
-  tar_target(lha_popn, get_lha_popn(2019) %>% st_filter(area_of_interest)),
-  tar_target(lha_age, get_lha_age(2019) %>% filter(Region %in% area_of_interest$LOCAL_HLTH_AREA_CODE))
-)
+
 # tidy --------------------------------------------------------------------
 
-# processing
 processing_targets <- list(
   tar_target(pm25_24h, pm25_data %>%
                rename(date_time = date_pst) %>%
@@ -57,8 +52,6 @@ processing_targets <- list(
   tar_target(heatwaves_raw, detect_heatwave(weather_data, pctile = 95)),
   tar_target(heatwaves, bind_heatwave_data(heatwaves_raw))
 )
-
-
 
 # Output ------------------------------------------------------------------
 
@@ -69,9 +62,7 @@ list(
   time_vars,
   climate_targets,
   processing_targets,
-  lha_demographics,
-  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
-  tar_render(lha_assessment, "out/lha_assessment.Rmd")
+  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
   )
 
 

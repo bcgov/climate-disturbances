@@ -1,9 +1,9 @@
 ---
-title: "Climate Disturbances Overview"
+title: "Climate Disturbances and Service Use Overview"
 date: "`r Sys.Date()`"
 output: 
   officedown::rpptx_document:
-    reference_doc: pptx-template.pptx
+    reference_doc: pptx-template-dpd.pptx
     
 ---
 
@@ -27,6 +27,9 @@ library(sf)
 library(heatwaveR)
 library(bcdata)
 library(lubridate)
+library(ggrepel)
+library(weathercan)
+library(tidyhydat)
 
 
 # ## Flex table defaults
@@ -42,12 +45,14 @@ if(.Platform$OS.type == "windows"){
 
 theme_set(theme_minimal(base_family = "Calibri") %+replace%
             theme(plot.caption = element_text(face = "italic", hjust = 1),
+                  plot.title = element_text(size = 20),
                   plot.title.position = "plot",
                   strip.text = element_text(size = 20),
                   panel.grid.major.x = element_blank(),
                   panel.grid.minor.x = element_blank(),
                   axis.title = element_text(size = 18),
-                  axis.text = element_text(size = 14))
+                  axis.text = element_text(size = 14), 
+                  panel.border = element_blank())
           )
 ```
 
@@ -70,18 +75,11 @@ edge [color = dodgerblue]
 ```
 
 
-## Overview
-```{r, fig.width=2, fig.height=2}
+
+```{r, fig.width=2, fig.height=2, eval=FALSE}
 grViz("
 digraph rmarkdown {
 graph [overlap = true, fontsize = 15]
-node [shape = box,
-      fontname = Calibri,
-      fontcolor = dodgerblue,
-      color = Grey]
-edge [color = dodgerblue ]
-
-'Climate Related Disturbance' -> 'Services Used' -> 'Demographics of that Service Usage'
 
 
 node [shape = circle,
@@ -89,121 +87,26 @@ node [shape = circle,
       fontcolor = MediumPurple,
       color = Grey]
 
-{Space Time}
+{'What?' 'Where?' 'When?'}
 }
 "
 )
 ```
 
-
-## What is the spatial extent of the MVP?
-
-:::::::::::::: {.columns}
-::: {.column}
-```{r, fig.width=12, fig.height=12}
-tm_shape(tar_read(lha_popn)) +
-  tm_polygons(col = "Total", style = "kmeans") +
-  tm_layout(title = "Local Health Area Population", scale = 2)
-```
-:::
-::: {.column}
-- For MVP do we choose a subset of the province to compare?
-- Which spatial data is available?
-  - Local Health Area smallest geographic unit of most health data
-  - Census Subdivision corresponds to municipal boundaries and is a geography that people intuitively know
-:::
-::::::::::::::
-
-## Wildfires - Health Authority
-```{r, eval=FALSE}
-tar_read(area_burned_over_time_by_lha) %>% 
-  mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
-  ggplot(aes(x = FIRE_YEAR, y = FIRE_SIZE_SQKM, colour = LOCAL_HLTH_AREA_NAME)) +
-  geom_line() +
-  labs(y = "Area Burned (km^2)") +
-  guides(colour = FALSE) +
-  theme(axis.title.x = element_blank()) +
-  facet_wrap(~HLTH_AUTHORITY_NAME)
-```
-
-
-
-## Temporal Considerations
-```{r, cache=TRUE}
-cum_area_burned <- bcdc_query_geodata('22c7cb44-1463-48f7-8e47-88857f207702') %>%
-  filter(FIRE_YEAR >= 2014) %>% 
-  select(FIRE_YEAR, FIRE_DATE, FIRE_SIZE_HECTARES) %>%
-  collect() %>% 
-  st_drop_geometry() %>% 
-  mutate(year = year(FIRE_DATE)) %>% 
-  group_by(year) %>% 
-  arrange(FIRE_DATE) %>% 
-  mutate(cum_burned = cumsum(FIRE_SIZE_HECTARES))
-  
-cum_area_burned %>% 
-  mutate(day_no_year = as.Date(paste('2010',month(FIRE_DATE), day(FIRE_DATE), sep = "-")), year = factor(year)) %>% 
-  ggplot() +
-  geom_line(aes(x = day_no_year, y = cum_burned, colour = year)) +
-  labs(y = "Cumulative Area Burned (hectares)") +
-  theme(axis.title.x = element_blank())
-```
-
-
-
-
-
-## Which Climate Related Disturbance?
+## Disturbance
 
 ### Wildfires
 
-- What is our measure? Air quality?
-
-### Extreme Heat
+### Extreme heat
 
 ### Flooding
 
-
-## Air Quality by Health Service Delivery Area
-```{r}
-tar_load(pm25_24h)
-
-pm25_24h$daily_avg %>% 
-  ggplot(aes(date, y = avg_24h, colour = station_name)) +
-  geom_line() +
-  guides(colour=FALSE) +
-  labs(y = "Daily PM 2.5 value", x = "Date") +
-  facet_wrap(~hlth_service_dlvr_area_name) +
-  theme(legend.position = "bottom")
-```
-
-## Heatwaves
-
-```{r}
-tar_load(heatwaves_raw)
-
-heatwaves_raw[["208"]] %>% 
-  event_line(min_duration = 2)
-```
-
-
-## River Level
-
-```{r}
-tar_load(flood_example)
-
-flood_example %>% 
-  filter(Date >= as.Date('2010-01-01')) %>% 
-  ggplot(aes(x = Date, y = Value)) +
-  geom_line()
-  
-```
-
-
+### (Crop failure, Sea level rise, Winter warming)
 
 ## Wildfires - Provincial
 
 ```{r}
-tar_read(area_burned_over_time_by_lha) %>% 
+tar_read(area_burned_over_time) %>% 
   mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
   group_by(FIRE_YEAR) %>% 
   summarise(FIRE_SIZE_SQKM = sum(FIRE_SIZE_SQKM)) %>% 
@@ -214,40 +117,147 @@ tar_read(area_burned_over_time_by_lha) %>%
 ```
 
 
+## Wildfire Measure: Air Quality
+```{r}
+tar_load(pm25_24h)
 
+label_df <- pm25_24h$daily_avg %>% 
+  ungroup() %>% 
+  filter(station_name == 'Kamloops Federal Building') %>% 
+  arrange(desc(avg_24h)) %>% 
+  slice(1:2) %>% 
+  mutate(avg_24h = avg_24h+10)
 
-
-
-## Heatwaves - Health Authority
-```{r, eval=FALSE}
-tar_read(heatwave_days_over_time_by_lha) %>% 
-  mutate(year = as.numeric(year)) %>% 
-  filter(year > 1960) %>% 
-  ggplot(aes(x = year, y = heatwave_days_per_station)) +
-  geom_line(aes(group = LOCAL_HLTH_AREA_NAME), colour = "grey80") +
-  geom_smooth() +
-  guides(colour = FALSE) +
-  facet_wrap(~HLTH_AUTHORITY_NAME)
+pm25_24h$daily_avg %>% 
+  ungroup() %>% 
+  filter(station_name == 'Kamloops Federal Building', date >= as.Date("2011-01-01")) %>% 
+  ggplot(aes(x = date, y = avg_24h, label = date)) +
+  geom_line() +
+  geom_label(data = label_df) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
+  labs(y = "Daily PM 2.5 value", x = "Date", title = unique(label_df$station_name)) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
+## Extreme Heat: Heatwaves
+```{r}
+tar_load(heatwaves_raw)
+
+name <- unique(stations$station_name[stations$station_id == "208"])
+
+heatwaves_raw[["208"]] %>% 
+  event_line(min_duration = 2, spread = 200) +
+  labs(title = name)
+```
+
+## Flooding: River Level
+
+```{r, cache=TRUE}
+tar_load(flood_example)
+
+stn_name <- hy_stations(station_number = flood_example$STATION_NUMBER)$STATION_NAME
+
+max_date <- flood_example[flood_example$Value == max(flood_example$Value),]
+
+flood_example %>% 
+  filter(Date >= as.Date('2010-01-01')) %>% 
+  ggplot(aes(x = Date, y = Value)) +
+  geom_line() +
+  geom_label(x = max_date$Date, y = max_date$Value+10, label = "Grand Forks Flood") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(title = stn_name)
+  
+```
+
+## Data Innovation Program
+
+:::::::::::::: {.columns}
+::: {.column}
+```{r}
+if (file.exists(here::here("img/dip.jpg"))) {
+  knitr::include_graphics(here::here("img/dip.jpg"))  
+}
+```
+:::
+::: {.column}
+
+Data Innovation Program: **link** and **de-identify** administrative datasets from ministries for **population-level** research projects in a secure analytics environment.
+:::
+::::::::::::::
 
 ## Service Usage
 ```{r ft.left=2, ft.top=2}
 tribble(
-  ~Service, ~Data, ~Difficulty,
-  "Ambulance call outs", "NACRS", "Low",
-  "Hospital visits", "DAD", "Medium",
-  "Income Assistance", "BCEA", "Low",
-  "Doctor visits", "MSP Billing", "High"
+  ~Service, ~Data, ~Ministry,
+  "Ambulance call outs", "NACRS", "Health",
+  "Hospital visits", "DAD", "Health",
+  "Income Assistance", "BCEA", "SDPR",
+  "Doctor visits", "MSP Billing", "Health",
+  "Employment Training", "Labour Market", "AEST",
+  "Support Services", "Children in Care",  "MCFD",
+  "Rental Supplements", "Rental Assistance", "BC Housing"
 ) %>% 
   flextable() %>% 
   autofit()
 ```
 
 
-## Demographics/Economics
-- Intersectionality
-- GBA+ lens
+## Local Health Areas
 
+:::::::::::::: {.columns}
+::: {.column}
+```{r, fig.width=12, fig.height=12}
+tm_shape(health_lha()) +
+  tm_fill(col = "LOCAL_HLTH_AREA_NAME", legend.show = FALSE) +
+  tm_layout(frame = FALSE)
+```
+:::
+::: {.column}
+
+> > The LHAs are a mutually exclusive and exhaustive classification of the land area in BC. LHAs are contiguous (land area is geographically adjacent) and fit within an existing geographical hierarchy structure, e.g., cannot violate higher-level geography boundaries such as the Health Service Delivery Areas (HSDA) and Health Authorities (HA).
+
+:::
+::::::::::::::
+
+
+
+## Air Quality by Local Health Area
+```{r}
+tar_load(pm25_24h)
+
+pm25_24h$daily_avg %>% 
+  filter(hlth_service_dlvr_area_name %in% c('Thompson Cariboo Shuswap', 'Okanagan')) %>% 
+  ggplot(aes(date, y = avg_24h, colour = station_name)) +
+  geom_line() +
+  labs(y = "Daily PM 2.5 value", x = "Date") +
+  scale_colour_viridis_d() +
+  facet_wrap(~local_hlth_area_name) +
+  theme(legend.position = "bottom")
+```
+
+## Census Subdivision?
+
+:::::::::::::: {.columns}
+::: {.column}
+```{r, fig.width=12, fig.height=12, cache=TRUE}
+tm_shape(st_intersection(census_subdivision(), bc_bound())) +
+  tm_fill(col = "CENSUS_SUBDIVISION_NAME", legend.show = FALSE) +
+  tm_layout(frame = FALSE)
+```
+:::
+::: {.column}
+
+> > Census subdivision (CSD) is the general term for municipalities (as determined by provincial/territorial legislation) or areas treated as municipal equivalents for statistical purposes.
+
+:::
+::::::::::::::
+
+
+
+
+## Demographics/Economics
+- Intersectionality/ GBA+ lens
 ```{r ft.left=2, ft.top=4}
 tribble(
   ~Variables, ~Data, ~`Data Location`,
