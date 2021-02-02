@@ -1,15 +1,14 @@
-[![img](https://img.shields.io/badge/Lifecycle-Experimental-339999)](https://github.com/bcgov/repomountie/blob/master/doc/lifecycle-badges.md)
+[![img](https://img.shields.io/badge/Lifecycle-Experimental-339999)](https://github.com/bcgov/repomountie/blob/master/doc/lifecycle-badges.md)[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-climate-disturbances
-============================
+# climate-disturbances
+
 
 ### Installation
 
-The targets package needs to be installed at this time from GitHub using:
+This project leverages the [{targets} package](https://docs.ropensci.org/targets/), a pipeline toolkit for data science projects in R. You can install {targets} from CRAN:
 
-```r
-library(remotes)
-install_github("ropensci/targets")
+```
+install.packages{"targets"}
 ```
 
 The packages used in this analysis are catalogued in the `R/setup.R`. It is likely that some of those packages won't be installed on your system. Those will need to be installed for this project to run.
@@ -30,17 +29,18 @@ All environmental data functions have some of common parameters:
 
 ### Air Quality
 
-The air quality data are sourced from this file: ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv
+The air quality data are sourced from the [B.C. Data Catalogue](https://catalogue.data.gov.bc.ca/dataset/air-quality-monitoring-verified-hourly-data), provided under the Open Government Licence&mdash;British Columbia (this file: ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv)
 
 Using the method implemented in `rcaaqs::pm_24h_caaqs()`, data were aggregated to a daily average. 
 
 ### Heatwaves
 
-Heatwave detection is implemented using data retrieved via the weathercan package and detected using the heatwaveR package
+Heatwave detection is implemented using Open Government Licence - Canada data retrieved via the [{weathercan} package](https://docs.ropensci.org/weathercan/) and detected using the [{heatwaveR} package](https://robwschlegel.github.io/heatwaveR/index.html).
+
 
 ### Floods
 
-Water level is retrieved from the HYDAT database using the tidyhydat package. 
+Water level (hydrometric) data is retrieved from the Environment & Climate Change Canada HYDAT database, provided under the Open Government Licence - Canada, using the [{tidyhydat} package](https://docs.ropensci.org/tidyhydat/). 
 
 
 ### Project Status
