@@ -17,16 +17,16 @@
 
 library(arrow)
 library(dplyr)
-library(weathercan) ## right now need to install dev version remotes::install_github("ropensci/weathercan", ref = "fix_normals")
+library(weathercan)
 library(purrr)
 library(cancensus)
 library(readr)
 library(tidyr)
 library(lubridate)
 library(sf)
-library(bcmaps) ## dev version
+library(bcmaps)
 library(bcdata)
-library(rcaaqs)
+library(rcaaqs) # available from GitHub https://github.com/bcgov/rcaaqs
 library(tidyhydat)
 
 ## Other scripts
