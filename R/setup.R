@@ -11,10 +11,9 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
-
-
 ## Packages
-
+library(targets)
+library(tarchetypes)
 library(arrow)
 library(dplyr)
 library(weathercan)
@@ -34,7 +33,8 @@ source("R/utils.R")
 source("R/functions.R")
 source("R/fn-disturbance-defn.R")
 
-
+## Folders
+if (!exists("data")) dir.create("data", showWarnings = FALSE)
 
 
 
