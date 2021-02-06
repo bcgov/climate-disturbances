@@ -52,12 +52,13 @@ pm25 <- function(aoi=NULL, add_aoi_attributes = TRUE, start_date = NULL, end_dat
   stations_in_aoi <- sf::st_filter(air_quality_stations_geo(), aoi)
   d <- get_pm25_data()
 
-  if (!is.null(aoi)) d <- filter(d, EMS_ID %in% stations_in_aoi$EMS_ID)
+  if (!is.null(aoi)) d <- filter(d, EMS_ID %in% unique(stations_in_aoi$EMS_ID))
   if (!is.null(start_date)) d <- filter(d, DATE_PST >= start_date)
   if (!is.null(end_date)) d <- filter(d, DATE_PST <= end_date)
 
   d <- d %>%
     collect()
+
 
   if(add_aoi_attributes) {
     geo_attr <- st_join(select(stations_in_aoi, EMS_ID), aoi)
