@@ -21,7 +21,7 @@ get_pm25_data <- function(...) {
 
   if (!file.exists(stored_path)) {
     dir.create(dirname(stored_path), showWarnings = FALSE )
-    download.file(pm25_link, destfile = stored_path, quiet = TRUE)
+    download.file(pm25_link, destfile = stored_path, quiet = TRUE, method = "curl")
   }
 
   arrow::open_dataset(dirname(stored_path), format = "csv", schema = arrow::schema(
