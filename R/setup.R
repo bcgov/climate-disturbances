@@ -27,6 +27,7 @@ library(bcmaps)
 library(bcdata)
 library(rcaaqs) # available from GitHub https://github.com/bcgov/rcaaqs
 library(tidyhydat)
+library(heatwaveR)
 
 ## Other scripts
 source("R/utils.R")
@@ -34,7 +35,7 @@ source("R/functions.R")
 source("R/fn-disturbance-defn.R")
 
 ## Folders
-if (!exists("data")) dir.create("data", showWarnings = FALSE)
+dir.create("data", showWarnings = FALSE)
 
 
 
