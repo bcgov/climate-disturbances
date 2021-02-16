@@ -30,6 +30,7 @@ library(plotly)
 ## Return a watershed based on a search string. This check the name of a city, watershed or river gauge station
 ## and then return whatever is needed
 munipality_watersheds <- function(search_string) {
+  
    m <- municipalities() %>% 
     filter(grepl(search_string, ADMIN_AREA_NAME, ignore.case = TRUE))
    
@@ -53,9 +54,12 @@ munipality_watersheds <- function(search_string) {
 }
 
 munipality_river_data <- function(name_of_region) {
+  
   stns <- hy_stations(prov_terr_state_loc = "BC") %>% 
     st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>% 
-    transform_bc_albers()
+    transform_bc_albers() %>% 
+    st_join(fsa() %>% select(CFSAUID)) %>% 
+    st_join(health_lha() %>% select(contains(c("LOCAL", "HLTH"))))
   
   stns %>% 
     st_join(munipality_watersheds(name_of_region), left = FALSE) %>% 
@@ -63,8 +67,8 @@ munipality_river_data <- function(name_of_region) {
     hy_daily_flows(start_date = '2000-01-01') %>% 
     mutate(date_within_year = ymd(paste0('2016-',month(Date),"-", day(Date)))) %>% 
     mutate(year = factor(year(Date))) %>% 
-    left_join(hy_stations()) %>% 
-    mutate(STATION = paste0(STATION_NAME, " (", STATION_NUMBER, ")")) %>% 
+    left_join(st_drop_geometry(stns)) %>% 
+    mutate(STATION = paste0(STATION_NAME, " (", STATION_NUMBER, ")", "\nLHA: ", LOCAL_HLTH_AREA_NAME, " (#",LOCAL_HLTH_AREA_CODE ,") " , "FSA: ", CFSAUID)) %>% 
     mutate(name_of_region = name_of_region)
   
 }
@@ -82,7 +86,8 @@ plot_munipality_river_data <- function(.data, year_of_interest) {
          x = "Date", y = "River Flow (m^3/s)") +
     facet_wrap(vars(STATION), scales = "free_y") +
     theme_minimal() +
-    theme(plot.title.position = 'plot')
+    theme(plot.title.position = 'plot',
+          strip.text = element_text(hjust = 0, face = "bold"))
 }
 ```
 
@@ -97,7 +102,7 @@ plot_munipality_river_data <- function(.data, year_of_interest) {
 
 ```{r}
 munipality_river_data('Pemberton') %>% 
-  plot_munipality_river_data(2003) 
+  plot_munipality_river_data(2003)
 ```
 
 ### Kingcome 2010
