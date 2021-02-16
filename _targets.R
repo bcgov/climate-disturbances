@@ -62,7 +62,8 @@ list(
   time_vars,
   climate_targets,
   processing_targets,
-  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd")
+  tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
+  tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd")
   )
 
 

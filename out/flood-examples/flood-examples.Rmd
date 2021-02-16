@@ -1,0 +1,165 @@
+---
+title: "Examples of Major Floods in British Columbia"
+output: html_document
+---
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.width = 20,
+                      fig.height = 12)
+
+library(tidyhydat)
+library(bcdata)
+library(ggplot2)
+library(dplyr)
+library(bcmaps)
+library(sf)
+library(lubridate)
+library(plotly)
+
+
+## Return a watershed based on a search string. This check the name of a city, watershed or river gauge station
+## and then return whatever is needed
+munipality_watersheds <- function(search_string) {
+  
+   m <- municipalities() %>% 
+    filter(grepl(search_string, ADMIN_AREA_NAME, ignore.case = TRUE))
+   
+   cm <- wsc_drainages() %>% 
+     st_filter(m)
+   
+   cw <- wsc_drainages() %>% 
+     filter(grepl(search_string, SUB_SUB_DRAINAGE_AREA_NAME, ignore.case = TRUE))
+   
+   cs <- wsc_drainages() %>% 
+     st_filter(
+       hy_stations(prov_terr_state_loc = "BC") %>% 
+         filter(grepl(search_string, STATION_NAME, ignore.case = TRUE)) %>% 
+         st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>% 
+         transform_bc_albers()
+     )
+   
+   bind_rows(cm, cw) %>% 
+     bind_rows(cs) %>% 
+     select(contains(c("DRAINAGE")))
+}
+
+munipality_river_data <- function(name_of_region) {
+  
+  stns <- hy_stations(prov_terr_state_loc = "BC") %>% 
+    st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>% 
+    transform_bc_albers() %>% 
+    st_join(fsa() %>% select(CFSAUID)) %>% 
+    st_join(health_lha() %>% select(contains(c("LOCAL", "HLTH"))))
+  
+  stns %>% 
+    st_join(munipality_watersheds(name_of_region), left = FALSE) %>% 
+    pull(STATION_NUMBER) %>% 
+    hy_daily_flows(start_date = '2000-01-01') %>% 
+    mutate(date_within_year = ymd(paste0('2016-',month(Date),"-", day(Date)))) %>% 
+    mutate(year = factor(year(Date))) %>% 
+    left_join(st_drop_geometry(stns)) %>% 
+    mutate(STATION = paste0(STATION_NAME, " (", STATION_NUMBER, ")", "\nLHA: ", LOCAL_HLTH_AREA_NAME, " (#",LOCAL_HLTH_AREA_CODE ,") " , "FSA: ", CFSAUID)) %>% 
+    mutate(name_of_region = name_of_region)
+  
+}
+
+plot_munipality_river_data <- function(.data, year_of_interest) {
+  name_of_region <- unique(.data$name_of_region)
+  
+  ggplot(.data, aes(x = date_within_year, y = Value, colour = year, group = year)) +
+    geom_line(alpha = 0.5) +
+    geom_line(data = .data[.data$year == year_of_interest,], size = 2) +
+    scale_x_date(date_labels = "%b") +
+    scale_colour_viridis_d(name = 'Year') +
+    labs(title = glue::glue("River Gauging Stations in Watersheds that Intersect '{name_of_region}'"),
+         subtitle = glue::glue("Thicker line represents the year of flood ({year_of_interest})"),
+         x = "Date", y = "River Flow (m^3/s)") +
+    facet_wrap(vars(STATION), scales = "free_y") +
+    theme_minimal() +
+    theme(plot.title.position = 'plot',
+          strip.text = element_text(hjust = 0, face = "bold"))
+}
+```
+
+# {.tabset}
+
+## Intense rainfall, atmospheric rivers {.tabset}
+
+
+
+### Pemberton 2003
+
+
+```{r}
+munipality_river_data('Pemberton') %>% 
+  plot_munipality_river_data(2003)
+```
+
+### Kingcome 2010
+
+
+```{r}
+munipality_river_data('Kingcome') %>% 
+  plot_munipality_river_data(2010) 
+```
+
+## Rapid Snowmelt {.tabset}
+
+### Nazko and Quesnel 2010
+
+```{r}
+munipality_river_data('Nazko|Quesnel') %>% 
+  plot_munipality_river_data(2018) 
+```
+
+### Bulkley 2007
+
+```{r}
+munipality_river_data('Bulkley') %>% 
+  plot_munipality_river_data(2007) 
+```
+
+
+## Ice Jam {.tabset}
+
+### Prince George 2007
+
+```{r}
+munipality_river_data('Prince George') %>% 
+  plot_munipality_river_data(2007) 
+```
+
+
+### Smithers 2015
+
+```{r}
+munipality_river_data('Smithers') %>% 
+  plot_munipality_river_data(2007) 
+```
+
+## Structural or operational dam failure {.tabset}
+
+### Testalinden 2010
+```{r}
+munipality_river_data('Testalinden') %>% 
+  plot_munipality_river_data(2010) 
+```
+
+
+## Two or more factors {.tabset}
+
+### Okanagan Lake 2017
+```{r}
+munipality_river_data('Okanagan') %>% 
+  plot_munipality_river_data(2017) 
+```
