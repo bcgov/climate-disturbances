@@ -11,10 +11,9 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
-
-
 ## Packages
-
+library(targets)
+library(tarchetypes)
 library(arrow)
 library(dplyr)
 library(weathercan)
@@ -28,13 +27,15 @@ library(bcmaps)
 library(bcdata)
 library(rcaaqs) # available from GitHub https://github.com/bcgov/rcaaqs
 library(tidyhydat)
+library(heatwaveR)
 
 ## Other scripts
 source("R/utils.R")
 source("R/functions.R")
 source("R/fn-disturbance-defn.R")
 
-
+## Folders
+dir.create("data", showWarnings = FALSE)
 
 
 
