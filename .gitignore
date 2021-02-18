@@ -10,5 +10,6 @@
 !pptx-template-dpd.pptx
 _targets
 data
+!flood-examples.csv
 img
 .DS_Store
