@@ -104,6 +104,7 @@ plot_munipality_river_data <- function(.data, year_of_interest) {
 ```{r}
 munipality_river_data('Pemberton') %>% 
   plot_munipality_river_data(2003) 
+  
 ```
 
 ### Kingcome 2010
@@ -111,7 +112,7 @@ munipality_river_data('Pemberton') %>%
 
 ```{r}
 munipality_river_data('Kingcome') %>% 
-  plot_munipality_river_data(2010) 
+  plot_munipality_river_data(2010)
 ```
 
 ## Rapid Snowmelt {.tabset}
@@ -130,6 +131,13 @@ munipality_river_data('Bulkley') %>%
   plot_munipality_river_data(2007) 
 ```
 
+### Grand Forks
+```{r}
+munipality_river_data('Grand Forks') %>% 
+  plot_munipality_river_data(2018) 
+
+```
+
 
 ## Ice Jam {.tabset}
 
@@ -137,7 +145,7 @@ munipality_river_data('Bulkley') %>%
 
 ```{r}
 munipality_river_data('Prince George') %>% 
-  plot_munipality_river_data(2007) 
+  plot_munipality_river_data(2007)
 ```
 
 
@@ -145,15 +153,7 @@ munipality_river_data('Prince George') %>%
 
 ```{r}
 munipality_river_data('Smithers') %>% 
-  plot_munipality_river_data(2007) 
-```
-
-## Structural or operational dam failure {.tabset}
-
-### Testalinden 2010
-```{r}
-munipality_river_data('Testalinden') %>% 
-  plot_munipality_river_data(2010) 
+  plot_munipality_river_data(2015) 
 ```
 
 
@@ -162,5 +162,5 @@ munipality_river_data('Testalinden') %>%
 ### Okanagan Lake 2017
 ```{r}
 munipality_river_data('Okanagan') %>% 
-  plot_munipality_river_data(2017) 
+  plot_munipality_river_data(2017) %>% ggplotly()
 ```
