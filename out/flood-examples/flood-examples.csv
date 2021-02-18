@@ -3,7 +3,7 @@ event_descriptor,keyword,start_date,end_date,peak,station_number,local_health_ar
 "Intense rainfall, atmospheric rivers",kingcome,2003-09-17,,2003-09-25,08GF008,Vancouver Island North,434,V0P
 rapid snowmelt,nazko,2018-04-05,2018-06-21,2018-04-30,08KE016,Quesnel,521,V2J
 rapid snowmelt,bulkley,2007-04-06,2007-09-30,2007-06-08,08EE004,Smithers,514,V0J
-rapid snowmelt,grand forks,2018-03-31,2018-07-25,2018-05-10,08NN002,Grand Forks,1900-05-05,V0H
+rapid snowmelt,grand forks,2018-03-31,2018-07-25,2018-05-10,08NN002,Grand Forks,126,V0H
 ice jam,prince george,2007-12-11,2008-02-07,,08JC002,Prince George,524,V2K
 ice jam,smithers,2015-12-27,,,08EE005,Smithers,514,V0J
 multiple drivers,okanagan lake,2017-03-15,2017-09-09,2017-06-10,08NM083,Vernon,136,
