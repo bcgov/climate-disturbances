@@ -143,10 +143,10 @@ pm25_24h$daily_avg %>%
 ## Extreme Heat: Heatwaves
 ```{r}
 tar_load(heatwaves_raw)
+station_num <- "1074"
+name <- unique(stations$station_name[stations$station_id == station_num])
 
-name <- unique(stations$station_name[stations$station_id == "208"])
-
-heatwaves_raw[["208"]] %>% 
+heatwaves_raw[[station_num]] %>% 
   event_line(min_duration = 2, spread = 200) +
   labs(title = name)
 ```
