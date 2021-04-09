@@ -131,7 +131,7 @@ munipality_river_data('Bulkley') %>%
   plot_munipality_river_data(2007) 
 ```
 
-### Grand Forks
+### Grand Forks 2018
 ```{r}
 munipality_river_data('Grand Forks') %>% 
   plot_munipality_river_data(2018) 
