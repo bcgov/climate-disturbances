@@ -30,6 +30,7 @@ library(lubridate)
 library(ggrepel)
 library(weathercan)
 library(tidyhydat)
+library(bcmaps)
 
 
 # ## Flex table defaults
@@ -95,18 +96,22 @@ pm25_24h$daily_avg %>%
         axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-## Air Quality by Local Health Area
+## Air Quality by Local Health Area and Hospitals
 ```{r}
-tar_load(pm25_24h)
+tar_load(hospitals)
 
-pm25_24h$daily_avg %>% 
-  filter(hlth_service_dlvr_area_name %in% c('Thompson Cariboo Shuswap', 'Okanagan')) %>% 
-  ggplot(aes(date, y = avg_24h, colour = station_name)) +
-  geom_line() +
-  labs(y = "Daily PM 2.5 value", x = "Date") +
-  scale_colour_viridis_d() +
-  facet_wrap(~local_hlth_area_name, ncol = 1) +
-  theme(legend.position = "bottom")
+sub_lha <- health_lha() %>% 
+  st_filter(hospitals)
+
+tm_shape(bc_bound()) +
+  tm_polygons() +
+  tm_shape(sub_lha) +
+  tm_fill(col = "blue", alpha = 0.3) +
+  tm_shape(hospitals) +
+  tm_dots(col = "OCCUPANT_NAME", size = 1, shape = 18, legend.show = FALSE) +
+  tm_text("OCCUPANT_NAME", size = 0.8)
+
+
 ```
 
 ```{r}

@@ -41,6 +41,13 @@ climate_targets <- list(
   tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
 )
 
+# health sites
+health_facilities <- list(
+  tar_target(hospitals, bcdc_query_geodata("bc-health-care-facilities-hospital") %>%
+               filter(INTERSECTS(area_of_interest)) %>%
+               collect())
+)
+
 
 # tidy --------------------------------------------------------------------
 
@@ -62,6 +69,7 @@ list(
   time_vars,
   climate_targets,
   processing_targets,
+  health_facilities,
   tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
   tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
   tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
