@@ -34,11 +34,18 @@ time_vars <- list(
 
 #  climate data
 climate_targets <- list(
-  tar_target(area_of_interest, health_lha() %>% st_filter(census_tract())),
+  tar_target(area_of_interest, health_lha() %>% filter(LOCAL_HLTH_AREA_NAME %in% c("Greater Nanaimo", "Kamloops", "Smithers", "Nelson", "Central Okanagan", "Greater Victoria"))),
   tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)),
   tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = TRUE, ask = FALSE)),
   tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
   tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
+)
+
+# health sites
+health_facilities <- list(
+  tar_target(hospitals, bcdc_query_geodata("bc-health-care-facilities-hospital") %>%
+               filter(INTERSECTS(area_of_interest)) %>%
+               collect())
 )
 
 
@@ -62,8 +69,10 @@ list(
   time_vars,
   climate_targets,
   processing_targets,
+  health_facilities,
   tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
-  tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd")
+  tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
+  tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
   )
 
 

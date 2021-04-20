@@ -1,0 +1,168 @@
+---
+title: "Poor Air Quality Examples"
+date: "`r Sys.Date()`"
+output: 
+  officedown::rpptx_document:
+    reference_doc: C:/work/_dev/GitHub_repos/climate-disturbances/out/pptx-template-dpd.pptx
+    
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE, 
+                      fig.width=12, 
+                      fig.height = 6, 
+                      dpi=300)
+
+library(here)
+library(tidyverse)
+library(flextable)
+library(extrafont)
+library(targets)
+library(DiagrammeR)
+library(tmap)
+library(sf)
+library(heatwaveR)
+library(bcdata)
+library(lubridate)
+library(ggrepel)
+library(weathercan)
+library(tidyhydat)
+library(bcmaps)
+
+
+# ## Flex table defaults
+set_flextable_defaults(
+  font.family = "Calibri", font.size = 28, font.color = "black",
+  text.align = "left",
+  table.layout = "fixed",
+  theme_fun = "theme_booktabs")
+
+if(.Platform$OS.type == "windows"){
+  loadfonts(device = "win", quiet = TRUE)
+}
+
+theme_set(theme_minimal(base_family = "Calibri") %+replace%
+            theme(plot.caption = element_text(face = "italic", hjust = 1),
+                  plot.title = element_text(size = 20),
+                  plot.title.position = "plot",
+                  strip.text = element_text(size = 20),
+                  panel.grid.major.x = element_blank(),
+                  panel.grid.minor.x = element_blank(),
+                  axis.title = element_text(size = 18),
+                  axis.text = element_text(size = 14), 
+                  panel.border = element_blank())
+          )
+```
+
+
+
+## Wildfires - Provincial
+
+```{r}
+tar_read(area_burned_over_time) %>% 
+  mutate(FIRE_SIZE_SQKM = FIRE_SIZE_HECTARES/100) %>% 
+  group_by(FIRE_YEAR) %>% 
+  summarise(FIRE_SIZE_SQKM = sum(FIRE_SIZE_SQKM)) %>% 
+  ggplot(aes(x = FIRE_YEAR, y = FIRE_SIZE_SQKM)) +
+  geom_line() +
+  labs(y = "Area Burned (km^2)") +
+  theme(axis.title.x = element_blank())
+```
+
+
+## Wildfire Measure: Air Quality
+```{r}
+tar_load(pm25_24h)
+
+label_df <- pm25_24h$daily_avg %>% 
+  ungroup() %>% 
+  filter(station_name == 'Kamloops Federal Building') %>% 
+  arrange(desc(avg_24h)) %>% 
+  slice(1:2) %>% 
+  mutate(avg_24h = avg_24h+10)
+
+pm25_24h$daily_avg %>% 
+  ungroup() %>% 
+  filter(station_name == 'Kamloops Federal Building', date >= as.Date("2011-01-01")) %>% 
+  ggplot(aes(x = date, y = avg_24h, label = date)) +
+  geom_line() +
+  geom_label(data = label_df) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
+  labs(y = "Daily PM 2.5 value", x = "Date", title = unique(label_df$station_name)) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Air Quality by Local Health Area and Hospitals
+```{r}
+tar_load(hospitals)
+
+sub_lha <- health_lha() %>% 
+  st_filter(hospitals)
+
+tm_shape(bc_bound()) +
+  tm_polygons() +
+  tm_shape(sub_lha) +
+  tm_fill(col = "blue", alpha = 0.3) +
+  tm_shape(hospitals) +
+  tm_dots(col = "OCCUPANT_NAME", size = 1, shape = 18, legend.show = FALSE) +
+  tm_text("OCCUPANT_NAME", size = 0.8)
+
+
+```
+
+```{r}
+pm25_plot <- function(lha = NULL, date_range = NULL) {
+  dat <- pm25_24h$daily_avg
+  
+  if (!is.null(lha)) {
+    dat <- filter(dat, local_hlth_area_name %in% lha)
+  }
+  
+  if (!is.null(date_range)) {
+    dat <- filter(dat, between(date, as.Date(date_range[1]), as.Date(date_range[2])))
+  }
+  
+  dat %>% 
+    group_by(local_hlth_area_name, date) %>% 
+    summarise(avg_24h = mean(avg_24h, na.rm = TRUE)) %>% 
+    ggplot(aes(date, y = avg_24h, colour = local_hlth_area_name)) +
+    geom_line(size = 2, alpha = 0.9) +
+    labs(y = "Mean Daily PM 2.5 value", x = "Date") +
+    scale_colour_viridis_d(name = "Local Health Area", option = "C", end = 0.5) +
+    scale_x_date(date_labels = "%b %d/'%y") +  
+    #facet_wrap(~local_hlth_area_name, ncol = 1) +
+    theme(legend.position = "bottom") 
+}
+```
+
+
+
+## Victoria and Kelowna Ex. 1
+```{r}
+pm25_plot(c("Greater Victoria", "Central Okanagan"), c("2015-08-01", "2015-09-01"))
+```
+
+## Victoria and Kelowna Ex. 2
+```{r}
+pm25_plot(c("Greater Victoria", "Central Okanagan"), c("2009-08-01", "2009-09-01"))
+```
+
+## Nelson and Smithers Ex. 1
+```{r}
+pm25_plot(c("Smithers", "Nelson"), c("2010-08-01", "2010-09-01"))
+```
+
+## Nelson and Smithers Ex. 2
+```{r}
+pm25_plot(c("Smithers", "Nelson"), c("2017-08-01", "2017-09-01"))
+```
+
+## Kamloops and Nanaimo
+```{r}
+pm25_plot(c("Greater Nanaimo", "Kamloops"), c("2010-08-01", "2010-09-01"))
+```
+
