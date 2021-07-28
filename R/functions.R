@@ -107,7 +107,7 @@ get_climate_data <- function(ids, data_dir = "data/weather", interval = "day", a
 
 weather_stations_geo <- function(interval_var = 'day') {
 
-  stations <- dplyr::filter(stations, prov == "BC", interval == interval_var)
+  stations <- dplyr::filter(stations(), prov == "BC", interval == interval_var)
   stations <- sf::st_as_sf(stations, coords = c("lon", "lat"), crs = "+proj=longlat")
   bcmaps::transform_bc_albers(stations)
 }

@@ -144,7 +144,7 @@ pm25_24h$daily_avg %>%
 ```{r}
 tar_load(heatwaves_raw)
 station_num <- "1074"
-name <- unique(stations$station_name[stations$station_id == station_num])
+name <- unique(stations()$station_name[stations()$station_id == station_num])
 
 heatwaves_raw[[station_num]] %>% 
   event_line(min_duration = 2, spread = 200) +

@@ -1,0 +1,101 @@
+---
+title: "Heatwave Overview"
+date: "`r Sys.Date()`"
+output: 
+  officedown::rpptx_document:
+    reference_doc: pptx-template-dpd.pptx
+    
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE, 
+                      fig.width=12, 
+                      fig.height = 6, 
+                      dpi=300)
+
+library(here)
+library(tidyverse)
+library(flextable)
+library(extrafont)
+library(targets)
+library(sf)
+library(heatwaveR)
+library(bcdata)
+library(lubridate)
+library(ggrepel)
+
+
+
+# ## Flex table defaults
+set_flextable_defaults(
+  font.family = "Calibri", font.size = 28, font.color = "black",
+  text.align = "left",
+  table.layout = "fixed",
+  theme_fun = "theme_booktabs")
+
+if(.Platform$OS.type == "windows"){
+  loadfonts(device = "win", quiet = TRUE)
+}
+
+theme_set(theme_minimal(base_family = "Calibri") %+replace%
+            theme(plot.caption = element_text(face = "italic", hjust = 1),
+                  plot.title = element_text(size = 20),
+                  plot.title.position = "plot",
+                  strip.text = element_text(size = 20),
+                  panel.grid.major.x = element_blank(),
+                  panel.grid.minor.x = element_blank(),
+                  axis.title = element_text(size = 18),
+                  axis.text = element_text(size = 14), 
+                  panel.border = element_blank())
+          )
+```
+
+
+
+## Extreme heat events
+```{r}
+tar_load(heatwaves_raw)
+
+station_id <- "114"
+station_name <- unique(stations()$station_name[stations()$station_id == station_id])
+
+june_hw <- heatwaves_raw[[station_id]] %>%
+  pluck("climatology") %>%
+  filter(t >= as.Date("2019-06-25"))
+
+june_hw_top <- june_hw %>%
+  filter(t >= as.Date("2021-06-25"))
+
+ggplot(data = june_hw, aes(x = t)) +
+  geom_flame(aes(y = temp, y2 = thresh, fill = "all"), show.legend = T) +
+  geom_flame(data = june_hw_top, aes(y = temp, y2 = thresh, fill = "top"),  show.legend = T) +
+  geom_line(aes(y = temp, colour = "temp")) +
+  geom_line(aes(y = thresh, colour = "thresh"), size = 1.0) +
+  geom_line(aes(y = seas, colour = "seas"), size = 1.2) +
+  scale_colour_manual(name = "Line Colour",
+                      values = c("temp" = "black",
+                                 "thresh" =  "forestgreen",
+                                 "seas" = "grey80")) +
+  scale_fill_manual(name = "Event Colour",
+                    values = c("all" = "salmon",
+                               "top" = "red")) +
+  scale_x_date(date_labels = "%b %Y") +
+  guides(colour = guide_legend(override.aes = list(fill = NA))) +
+  labs(y = expression(paste("Temperature [", degree, "C]")), x = NULL,
+       title = station_name)
+
+```
+
+
+
+## Intensity
+```{r}
+heatwaves_raw[[station_id]] %>% 
+  event_line(min_duration = 3, spread = 200, metric = "intensity_max", category = TRUE) +
+  labs(title = station_name)
+```
+
+
