@@ -6,6 +6,7 @@
 *.csv
 *.pptx
 *.html
+*.png
 !pptx-template.pptx
 !pptx-template-dpd.pptx
 _targets
