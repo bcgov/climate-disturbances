@@ -102,9 +102,6 @@ get_climate_data <- function(ids, data_dir = "data/weather", interval = "day", a
   invisible(TRUE)
 }
 
-
-
-
 weather_stations_geo <- function(interval_var = 'day') {
 
   stations <- dplyr::filter(stations(), prov == "BC", interval == interval_var)
@@ -115,9 +112,6 @@ weather_stations_geo <- function(interval_var = 'day') {
 normals_stations_geo <- function() {
    dplyr::filter(stations, normals, prov == "BC", interval == "day")
 }
-
-
-
 
 weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL, interval_var = 'day', normals, ask = TRUE) {
 
@@ -162,3 +156,61 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
   janitor::clean_names(d)
 
 }
+
+########### Homogenized daily temps
+
+download_homog_data <- function(save_csv = FALSE, datadir = "data") {
+  url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily/Homog_daily_max_temp_v2020_Gen3.zip"
+  destfile <- tempfile(fileext = ".zip")
+  download.file(url, destfile = destfile)
+  exdir <- ifelse(save_csv, datadir, dirname(destfile))
+  if (!dir.exists(exdir)) dir.create(exdir, recursive = TRUE)
+  unzip(destfile, exdir = exdir)
+}
+
+read_homog_data <- function(datafile) {
+
+  txt <- readLines(datafile)
+
+  stn_meta <- unlist(strsplit(txt[1], split = "\\s*,\\s*"))
+  names(stn_meta) <- c("stn_id", "stn_name", "province",
+                   "stn_joined", "element", "unit",
+                   "stn_last_updated")
+
+  header <- gsub("^\\s+|\\s+$", "", txt[3])
+  header <- strsplit(gsub("\\s+((Day)\\s0?)?", ",\\2", header), ",")[[1]]
+
+  data <- txt[5:length(txt)]
+  data <- gsub("-9999.9[a-zA-Z]?", " NA ", data)
+  data <- gsub("^\\s+|\\s+$", "", data)
+  data <- gsub("\\s+", ",", data)
+  data <- paste(data, collapse = "\n")
+  data <- readr::read_csv(I(data), col_names = header)
+
+  for (i in seq_along(stn_meta)) {
+    data[[names(stn_meta)[i]]] <- stn_meta[i]
+  }
+
+  data <- tidyr::pivot_longer(data, cols = starts_with("Day"),
+                       names_to = "DoM", values_to = "temp")
+  data <- dplyr::mutate(
+    data,
+    date = as.Date(
+      paste(Year, Mo, gsub("Day", "", DoM), sep = "-")
+    ))
+
+  data <- dplyr::mutate(
+    data,
+    flag = dplyr::case_when(
+      grepl("a", temp) ~ "adjusted",
+      grepl("E", temp) ~ "estimated",
+      TRUE ~ NA_character_
+    ),
+    temp = as.numeric(gsub("[a-zA-Z]", "", temp))
+  )
+
+  data %>%
+    dplyr::select(date, temp, dplyr::everything(), -Year, -Mo, -DoM) %>%
+    dplyr::filter(!is.na(date))
+}
+
