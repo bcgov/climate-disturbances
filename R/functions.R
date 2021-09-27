@@ -204,8 +204,8 @@ read_homog_data <- function(datafile) {
                               names_to = "DoM", values_to = "temp")
 
   # Check for undocumented flags:
-  if (any(grepl("[b-zA-DF-Z]", data$temp))) {
-    stop("uknown data quality flags in ", datafile, call. = FALSE)
+  if (any(grepl("[b-df-zB-DF-Z]", data$temp))) {
+    stop("Unknown data quality flags in ", datafile, call. = FALSE)
   }
 
   data <- dplyr::mutate(
@@ -217,8 +217,8 @@ read_homog_data <- function(datafile) {
   data <- dplyr::mutate(
     data,
     flag = dplyr::case_when(
-      grepl("a", temp) ~ "adjusted",
-      grepl("E", temp) ~ "estimated",
+      grepl("[aA]", temp) ~ "adjusted",
+      grepl("[eE]", temp) ~ "estimated",
       TRUE ~ NA_character_
     ),
     temp = as.numeric(gsub("[a-zA-Z]", "", temp))
