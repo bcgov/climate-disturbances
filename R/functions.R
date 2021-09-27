@@ -170,29 +170,44 @@ download_homog_data <- function(save_csv = FALSE, datadir = "data") {
 
 read_homog_data <- function(datafile) {
 
-  txt <- readLines(datafile)
+  txt <- readLines(datafile, n = 3)
 
   stn_meta <- unlist(strsplit(txt[1], split = "\\s*,\\s*"))
-  names(stn_meta) <- c("stn_id", "stn_name", "province",
-                   "stn_joined", "element", "unit",
-                   "stn_last_updated")
+  meta_names <- c("stn_id", "stn_name", "province",
+                  "stn_joined", "element", "unit",
+                  "stn_last_updated")
+  if (length(stn_meta) != length(meta_names)) {
+    stop("Unexpected format of metadata in file ", datafile,
+         call. = FALSE)
+  }
+  names(stn_meta) <- meta_names
 
   header <- gsub("^\\s+|\\s+$", "", txt[3])
   header <- strsplit(gsub("\\s+((Day)\\s0?)?", ",\\2", header), ",")[[1]]
 
-  data <- txt[5:length(txt)]
-  data <- gsub("-9999.9[a-zA-Z]?", " NA ", data)
-  data <- gsub("^\\s+|\\s+$", "", data)
-  data <- gsub("\\s+", ",", data)
-  data <- paste(data, collapse = "\n")
-  data <- readr::read_csv(I(data), col_names = header)
+  if (!length(header) == 33) {
+    stop("Unexpected data format in ", datafile, call. = FALSE)
+  }
+
+  data <- readr::read_fwf(
+    datafile,
+    col_positions = readr::fwf_widths(c(6, 3, rep(8, 31)), col_names = header),
+    na = c("-9999.9", "-9999.9M"), skip = 4,
+    col_types = paste0("ii", paste0(rep("c", 31), collapse = ""))
+  )
 
   for (i in seq_along(stn_meta)) {
     data[[names(stn_meta)[i]]] <- stn_meta[i]
   }
 
   data <- tidyr::pivot_longer(data, cols = starts_with("Day"),
-                       names_to = "DoM", values_to = "temp")
+                              names_to = "DoM", values_to = "temp")
+
+  # Check for undocumented flags:
+  if (any(grepl("[b-zA-DF-Z]", data$temp))) {
+    stop("uknown data quality flags in ", datafile, call. = FALSE)
+  }
+
   data <- dplyr::mutate(
     data,
     date = as.Date(
@@ -211,6 +226,5 @@ read_homog_data <- function(datafile) {
 
   data %>%
     dplyr::select(date, temp, dplyr::everything(), -Year, -Mo, -DoM) %>%
-    dplyr::filter(!is.na(date))
+    dplyr::filter(!is.na(date)) # Remove invalid dates
 }
-
