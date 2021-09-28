@@ -264,4 +264,29 @@ write_ahccd_data <- function(zipfile, save_raw_txt = FALSE,
   file.path(data_dir, "parquet")
 }
 
+get_ahccd_stations <- function() {
+  stations_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily/Homog_Temperature_Stations_Gen3.xls"
+
+  stations_file <- basename(stations_url)
+
+  download.file(stations_url, destfile = stations_file)
+
+  colnames <- names(readxl::read_excel(stations_file, skip = 2, n_max = 2))
+
+  stations <- readxl::read_excel(stations_file, skip = 4, col_names = colnames)
+
+  stations <- stations %>%
+    janitor::clean_names() %>%
+    dplyr::mutate(from = paste(from, x6, sep = "-"),
+           to = paste(to, x8, sep = "-")) %>%
+    dplyr::select(-x6, -x8)
+
+  sf::st_as_sf(stations, coords = c("long_deg", "lat_deg"), crs = 4326)
+}
+
+get_target_stations <- function(stations, buffer) {
+  bc_buff <- sf::st_buffer(st_union(bcmaps::bc_bound()), dist = buffer * 1000)
+  stations <- sf::st_transform(stations, sf::st_crs(bc_buff))
+  stations <- sf::st_intersection(stations, bc_buff, sparse = FALSE)
+  stations
 }

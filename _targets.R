@@ -42,6 +42,8 @@ climate_targets <- list(
   # tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date)),
   tar_target(ahccd_zipfile, download_ahccd_data(which = "daily_max_temp", data_dir = "data"), format = "file"),
   tar_target(daily_tmax_path, write_ahccd_data(ahccd_zipfile), format = "file"),
+  tar_target(climate_stations, get_ahccd_stations()),
+  tar_target(target_stations, get_target_stations(climate_stations, buffer = 200))
 )
 
 # health sites

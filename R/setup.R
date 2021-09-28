@@ -16,7 +16,7 @@ library(targets)
 library(tarchetypes)
 library(arrow)
 library(dplyr)
-library(weathercan)
+library(weathercan) # install.packages("weathercan", repos = 'https://ropensci.r-universe.dev')
 library(purrr)
 library(cancensus)
 library(readr)
@@ -28,6 +28,7 @@ library(bcdata)
 library(rcaaqs) # available from GitHub https://github.com/bcgov/rcaaqs
 library(tidyhydat)
 library(heatwaveR)
+library(readxl)
 
 ## Other scripts
 source("R/utils.R")
