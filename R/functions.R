@@ -159,16 +159,19 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
 
 ########### Homogenized daily temps
 
-download_homog_data <- function(save_csv = FALSE, datadir = "data") {
-  url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily/Homog_daily_max_temp_v2020_Gen3.zip"
+download_ahccd_data <- function(save_raw_txt, which, data_dir) {
+  base_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily"
+  files_df <- rvest::html_table(rvest::read_html(base_url))[[1]]
+  which_file <- grepl(which, files_df$Name) & grepl("2020", files_df$Name) & tools::file_ext(files_df$Name) == "zip"
+  url <- paste0(base_url, "/", files_df$Name[which_file])
   destfile <- tempfile(fileext = ".zip")
   download.file(url, destfile = destfile)
-  exdir <- ifelse(save_csv, datadir, dirname(destfile))
+  exdir <- ifelse(save_raw_txt, file.path(data_dir, "raw_txt"), dirname(destfile))
   if (!dir.exists(exdir)) dir.create(exdir, recursive = TRUE)
   unzip(destfile, exdir = exdir)
 }
 
-read_homog_data <- function(datafile) {
+read_ahccd_data <- function(datafile) {
 
   txt <- readLines(datafile, n = 3)
 
@@ -227,4 +230,27 @@ read_homog_data <- function(datafile) {
   data %>%
     dplyr::select(date, temp, dplyr::everything(), -Year, -Mo, -DoM) %>%
     dplyr::filter(!is.na(date)) # Remove invalid dates
+}
+
+get_ahccd_data <- function(save_raw_txt = FALSE,
+                           which = c("daily_max_temp", "daily_mean_temp", "daily_min_temp"),
+                           data_dir = paste0("data/AHCCD_", which)) {
+  which <- match.arg(which)
+
+  files <- download_ahccd_data(save_raw_txt = save_raw_txt, which = which, data_dir = data_dir)
+
+  dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+
+  message("Writing:")
+
+  purrr::walk(files, function(x) {
+    d <- read_ahccd_data(x)
+    stn_id <- tools::file_path_sans_ext(basename(x))
+    parquetfile <- file.path(data_dir, "parquet", stn_id, "data.parquet")
+    message(parquetfile)
+    dir.create(dirname(parquetfile), recursive = TRUE, showWarnings = FALSE)
+    arrow::write_parquet(d, sink = parquetfile)
+    rm(d)
+    gc()
+  })
 }
