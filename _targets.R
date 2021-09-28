@@ -34,12 +34,14 @@ time_vars <- list(
 
 #  climate data
 climate_targets <- list(
-  tar_target(area_of_interest, health_lha() %>% filter(grepl("Vancouver", LOCAL_HLTH_AREA_NAME, ignore.case = TRUE) |
-                                                       LOCAL_HLTH_AREA_NAME %in% c("Greater Nanaimo", "Kamloops", "Smithers", "Nelson", "Central Okanagan", "Greater Victoria"))),
-  #tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)), ##pm data has some issues with arrow col specs
-  tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = FALSE, ask = FALSE)),
-  tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
-  tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date))
+  # tar_target(area_of_interest, health_lha() %>% filter(grepl("Vancouver", LOCAL_HLTH_AREA_NAME, ignore.case = TRUE) |
+  #                                                      LOCAL_HLTH_AREA_NAME %in% c("Greater Nanaimo", "Kamloops", "Smithers", "Nelson", "Central Okanagan", "Greater Victoria"))),
+  # #tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)), ##pm data has some issues with arrow col specs
+  # tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = FALSE, ask = FALSE)),
+  # tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
+  # tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date)),
+  tar_target(ahccd_zipfile, download_ahccd_data(which = "daily_max_temp", data_dir = "data"), format = "file"),
+  tar_target(daily_tmax_path, write_ahccd_data(ahccd_zipfile), format = "file"),
 )
 
 # health sites
@@ -67,13 +69,13 @@ processing_targets <- list(
 ## Pipeline
 
 list(
-  time_vars,
+  # time_vars,
   climate_targets,
-  processing_targets,
-  health_facilities,
+  # processing_targets,
+  # health_facilities,
   #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
-  tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
-  tar_render(heatwave_overview, "out/heatwave-overview.Rmd"),
+  # tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
+  # tar_render(heatwave_overview, "out/heatwave-overview.Rmd"),
   #tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
   NULL
   )

@@ -159,19 +159,25 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
 
 ########### Homogenized daily temps
 
-download_ahccd_data <- function(save_raw_txt, which, data_dir) {
+download_ahccd_data <- function(which = c("daily_max_temp", "daily_mean_temp", "daily_min_temp"), data_dir = "data") {
+  which <- match.arg(which)
   base_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily"
   files_df <- rvest::html_table(rvest::read_html(base_url))[[1]]
   which_file <- grepl(which, files_df$Name) & grepl("2020", files_df$Name) & tools::file_ext(files_df$Name) == "zip"
-  url <- paste0(base_url, "/", files_df$Name[which_file])
-  destfile <- tempfile(fileext = ".zip")
+  fname <- files_df$Name[which_file]
+  url <- paste0(base_url, "/", fname)
+  destfile <- file.path(data_dir, fname)
   download.file(url, destfile = destfile)
-  exdir <- ifelse(save_raw_txt, file.path(data_dir, "raw_txt"), dirname(destfile))
-  if (!dir.exists(exdir)) dir.create(exdir, recursive = TRUE)
-  unzip(destfile, exdir = exdir)
+  destfile
 }
 
-read_ahccd_data <- function(datafile) {
+extract_ahccd_data <- function(zipfile, save_raw_txt = FALSE, data_dir) {
+  exdir <- ifelse(save_raw_txt, file.path(data_dir, "raw_txt"), tempdir())
+  if (!dir.exists(exdir)) dir.create(exdir, recursive = TRUE)
+  unzip(zipfile, exdir = exdir)
+}
+
+read_ahccd_data_single <- function(datafile) {
 
   txt <- readLines(datafile, n = 3)
 
@@ -228,29 +234,34 @@ read_ahccd_data <- function(datafile) {
   )
 
   data %>%
-    dplyr::select(date, temp, dplyr::everything(), -Year, -Mo, -DoM) %>%
+    dplyr::select(date, year = Year, month = Mo, temp, dplyr::everything(), -DoM) %>%
     dplyr::filter(!is.na(date)) # Remove invalid dates
 }
 
-get_ahccd_data <- function(save_raw_txt = FALSE,
+write_ahccd_data <- function(zipfile, save_raw_txt = FALSE,
                            which = c("daily_max_temp", "daily_mean_temp", "daily_min_temp"),
-                           data_dir = paste0("data/AHCCD_", which)) {
+                           data_dir = "data/AHCCD_data") {
   which <- match.arg(which)
-
-  files <- download_ahccd_data(save_raw_txt = save_raw_txt, which = which, data_dir = data_dir)
+  data_dir <- file.path(data_dir, which)
 
   dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
-  message("Writing:")
+  files <- extract_ahccd_data(zipfile, save_raw_txt = save_raw_txt, data_dir = data_dir)
+
+  files <- files
+
+  message("Writing parquet files for ", length(files),
+          " stations, partitioning by year")
 
   purrr::walk(files, function(x) {
-    d <- read_ahccd_data(x)
+    d <- read_ahccd_data_single(x)
+    d <- dplyr::group_by(d, year)
     stn_id <- tools::file_path_sans_ext(basename(x))
-    parquetfile <- file.path(data_dir, "parquet", stn_id, "data.parquet")
-    message(parquetfile)
-    dir.create(dirname(parquetfile), recursive = TRUE, showWarnings = FALSE)
-    arrow::write_parquet(d, sink = parquetfile)
-    rm(d)
-    gc()
+    parquet_path <- file.path(data_dir, "parquet", stn_id)
+    arrow::write_dataset(d, parquet_path, format = "parquet")
   })
+
+  file.path(data_dir, "parquet")
+}
+
 }
