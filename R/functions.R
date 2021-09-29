@@ -159,16 +159,18 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
 
 ########### Homogenized daily temps
 
-download_ahccd_data <- function(which = c("daily_max_temp", "daily_mean_temp", "daily_min_temp"), data_dir = "data") {
-  which <- match.arg(which)
+download_ahccd_data <- function(data_dir = "data") {
   base_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily"
   files_df <- rvest::html_table(rvest::read_html(base_url))[[1]]
-  which_file <- grepl(which, files_df$Name) & grepl("2020", files_df$Name) & tools::file_ext(files_df$Name) == "zip"
+  which_file <- grepl("daily_max_temp|daily_mean_temp|daily_min_temp", files_df$Name) & grepl("2020", files_df$Name) & tools::file_ext(files_df$Name) == "zip"
   fname <- files_df$Name[which_file]
-  url <- paste0(base_url, "/", fname)
-  destfile <- file.path(data_dir, fname)
-  download.file(url, destfile = destfile)
-  destfile
+
+  vapply(fname, function(n) {
+    url <- paste0(base_url, "/", n)
+    destfile <- file.path(data_dir, n)
+    download.file(url, destfile = destfile)
+    destfile
+  }, FUN.VALUE = character(1), USE.NAMES = FALSE)
 }
 
 extract_ahccd_data <- function(zipfile, save_raw_txt = FALSE, data_dir) {
@@ -230,37 +232,49 @@ read_ahccd_data_single <- function(datafile) {
       grepl("[eE]", temp) ~ "estimated",
       TRUE ~ NA_character_
     ),
+    measure = dplyr::case_when(
+      element == "Homogenized daily maximum temperature" ~ "daily_max",
+      element == "Homogenized daily minimum temperature" ~ "daily_min",
+      element == "Homogenized daily mean temperature" ~ "daily_mean",
+      TRUE ~ NA_character_
+    ),
     temp = as.numeric(gsub("[a-zA-Z]", "", temp))
   )
 
   data %>%
-    dplyr::select(date, year = Year, month = Mo, temp, dplyr::everything(), -DoM) %>%
+    dplyr::select(stn_id, stn_name, measure, date, year = Year,
+                  month = Mo, temp, dplyr::everything(),
+                  -DoM) %>%
     dplyr::filter(!is.na(date)) # Remove invalid dates
 }
 
-write_ahccd_data <- function(zipfile, save_raw_txt = FALSE,
-                           which = c("daily_max_temp", "daily_mean_temp", "daily_min_temp"),
+write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
                            data_dir = "data/AHCCD_data") {
-  which <- match.arg(which)
-  data_dir <- file.path(data_dir, which)
 
-  dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+  stopifnot(length(zipfiles) == 3L)
+  stopifnot(all(file.exists(zipfiles)))
 
-  files <- extract_ahccd_data(zipfile, save_raw_txt = save_raw_txt, data_dir = data_dir)
+  fpaths <- lapply(zipfiles, function(n) {
+    files <- extract_ahccd_data(n, save_raw_txt = save_raw_txt, data_dir = data_dir)
+    files
+  })
 
-  files <- files
+  message("Writing parquet files for ", length(fpaths[[1]]),
+          " stations, partitioning by stn_id, measure, and year")
 
-  message("Writing parquet files for ", length(files),
-          " stations, partitioning by stn_id and year")
+  parquet_path <- file.path(data_dir, "parquet")
 
-  purrr::walk(files, function(x) {
-    d <- read_ahccd_data_single(x)
-    d <- dplyr::group_by(d, stn_id, year)
-    parquet_path <- file.path(data_dir, "parquet")
+  purrr::pwalk(fpaths, function(x, y, z) {
+    d1 <- read_ahccd_data_single(x)
+    d2 <- read_ahccd_data_single(y)
+    d3 <- read_ahccd_data_single(z)
+
+    d <- dplyr::bind_rows(d1, d2, d3)
+    d <- dplyr::group_by(d, stn_id, measure, year)
     arrow::write_dataset(d, parquet_path, format = "parquet")
   })
 
-  file.path(data_dir, "parquet")
+  parquet_path
 }
 
 get_ahccd_stations <- function() {

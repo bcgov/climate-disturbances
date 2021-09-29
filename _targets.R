@@ -40,8 +40,16 @@ climate_targets <- list(
   # tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = FALSE, ask = FALSE)),
   # tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
   # tar_target(flood_example, hy_daily_flows("08NN002", start_date = start_date, end_date = end_date)),
-  tar_target(ahccd_zipfile, download_ahccd_data(which = "daily_max_temp", data_dir = "data"), format = "file"),
-  tar_target(daily_tmax_path, write_ahccd_data(ahccd_zipfile), format = "file"),
+  tar_target(
+    ahccd_zipfiles,
+    download_ahccd_data(data_dir = "data"),
+    format = "file"
+  ),
+  tar_target(
+    ahccd_parquet_path,
+    write_ahccd_data(ahccd_zipfiles),
+    format = "file"
+  ),
   tar_target(climate_stations, get_ahccd_stations()),
   tar_target(target_stations, get_target_stations(climate_stations, buffer = 200))
 )
@@ -54,32 +62,32 @@ health_facilities <- list(
 )
 
 
-# tidy --------------------------------------------------------------------
+  # tidy --------------------------------------------------------------------
 
-processing_targets <- list(
-  # tar_target(pm25_24h, pm25_data %>%
-  #              rename(date_time = date_pst) %>%
-  #              distinct() %>%
-  #              pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name"))),
-  tar_target(heatwaves_raw, detect_heatwave(weather_data, pctile = 95, minDuration = 3)),
-  tar_target(heatwaves, bind_heatwave_data(heatwaves_raw))
-)
+  processing_targets <- list(
+    # tar_target(pm25_24h, pm25_data %>%
+    #              rename(date_time = date_pst) %>%
+    #              distinct() %>%
+    #              pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name"))),
+    tar_target(heatwaves_raw, detect_heatwave(weather_data, pctile = 95, minDuration = 3)),
+    tar_target(heatwaves, bind_heatwave_data(heatwaves_raw))
+  )
 
-# Output ------------------------------------------------------------------
+  # Output ------------------------------------------------------------------
 
 
-## Pipeline
+  ## Pipeline
 
-list(
-  # time_vars,
-  climate_targets,
-  # processing_targets,
-  # health_facilities,
-  #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
-  # tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
-  # tar_render(heatwave_overview, "out/heatwave-overview.Rmd"),
-  #tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
-  NULL
+  list(
+    # time_vars,
+    climate_targets,
+    # processing_targets,
+    # health_facilities,
+    #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
+    # tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
+    # tar_render(heatwave_overview, "out/heatwave-overview.Rmd"),
+    #tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
+    NULL
   )
 
 
