@@ -264,6 +264,7 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
 
   parquet_path <- file.path(data_dir, "parquet")
 
+  # this could be done in parallel
   purrr::pwalk(fpaths, function(x, y, z) {
     d1 <- read_ahccd_data_single(x)
     d2 <- read_ahccd_data_single(y)
