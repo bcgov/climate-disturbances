@@ -251,13 +251,12 @@ write_ahccd_data <- function(zipfile, save_raw_txt = FALSE,
   files <- files
 
   message("Writing parquet files for ", length(files),
-          " stations, partitioning by year")
+          " stations, partitioning by stn_id and year")
 
   purrr::walk(files, function(x) {
     d <- read_ahccd_data_single(x)
-    d <- dplyr::group_by(d, year)
-    stn_id <- tools::file_path_sans_ext(basename(x))
-    parquet_path <- file.path(data_dir, "parquet", stn_id)
+    d <- dplyr::group_by(d, stn_id, year)
+    parquet_path <- file.path(data_dir, "parquet")
     arrow::write_dataset(d, parquet_path, format = "parquet")
   })
 
