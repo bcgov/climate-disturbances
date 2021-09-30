@@ -1,8 +1,13 @@
 library(bcmaps)
 library(stars)
+library(raster)
+library(fields)
 library(sf)
 library(targets)
 library(dplyr)
+
+tar_load(climate_stations)
+tar_load(ahccd_parquet_path)
 
 bbox <- bc_cities(ask = FALSE) %>%
   filter(NAME == "Kamloops") %>%
@@ -10,11 +15,21 @@ bbox <- bc_cities(ask = FALSE) %>%
   st_transform(4326) %>%
   st_bbox()
 
-dem_stars <- cded_stars(bbox, check = FALSE)
-dem_rast <- cded_raster(bbox, check = FALSE)
+vrtfile <- "data/test.vrt"
 
-tar_load(climate_stations)
-tar_load(ahccd_parquet_path)
+if (!file.exists(vrtfile)) {
+  # dem_stars <- cded_stars(bbox, check_tiles = FALSE, dest_vrt = vrtfile)
+  dem_rast <- cded_raster(bbox, check_tiles = FALSE)
+} else {
+  # dem_stars <- stars::read_stars(vrtfile, proxy = FALSE)
+  dem_rast <- raster(vrtfile)
+}
+
+stations <- st_filter(climate_stations, st_as_sfc(bbox)) %>%
+  st_transform(st_crs(dem_stars))
+
+# stations$elevation <- st_extract(dem_stars, stations)
+stations$elevation <- raster::extract(dem_rast, as(stations, "Spatial"))
 
 min_date <- as.Date("2020-07-01")
 max_date <- as.Date("2020-09-01")
@@ -25,10 +40,7 @@ all_data <- arrow::open_dataset(ahccd_parquet_path) %>%
   select(stn_id, date, temp) %>%
   collect()
 
-stations <- st_filter(climate_stations, st_as_sfc(bbox)) %>%
-  st_transform(st_crs(dem_stars))
 
-stations$elevation <- st_extract(dem_stars, stations)
 # extract elevations - store as z or column?
 
 stns_elev <- select(stations, stn_id, elev_m)
