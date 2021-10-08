@@ -10,14 +10,17 @@ library(tictoc)
 library(ncdf4)
 library(ggplot2)
 
+source("scratch/era-5-land-test.R")
+
 tar_load(climate_stations)
 tar_load(ahccd_parquet_path)
 
-bbox <- bc_cities(ask = FALSE) %>%
-  filter(NAME == "Kamloops") %>%
-  st_buffer(dist = 200*1000) %>%
-  st_transform(4326) %>%
-  st_bbox()
+# bbox <- bc_cities(ask = FALSE) %>%
+#   filter(NAME == "Kamloops") %>%
+#   st_buffer(dist = 200*1000) %>%
+#   st_transform(4326) %>%
+#   st_bbox()
+bbox <- aoi
 
 vrtfile <- "data/test.vrt"
 
@@ -26,20 +29,24 @@ if (!file.exists(vrtfile)) {
 }
 
 # dem_terra <- terra::rast(vrtfile)
-dem_rast <- raster::raster(vrtfile)
-# dem_stars <- stars::read_stars(vrtfile)
+# dem_rast <- raster::raster(vrtfile)
+dem_stars <- stars::read_stars(vrtfile)
 
 ## Aggregate to .01 degree (about 900m)
 # dem_stars <- st_warp(dem_stars, crs = 3005, cellsize = 0.01, method = "cubic", use_gdal = TRUE)
 # dem_rast <- as(dem_stars, "Raster")
 
-dem_rast <- projectRaster(dem_rast, res = 1000, crs = "+init=epsg:3005", method = "bilinear")
-dem_stars <- st_as_stars(dem_rast)
+# dem_rast <- projectRaster(dem_rast, as(d_agg_test, "Raster"), method = "bilinear")
+# dem_rast <- projectRaster(dem_rast, res = 1000, crs = "+init=epsg:3005", method = "bilinear")
+# dem_stars <- st_as_stars(dem_rast)
+
+# Warp to match resolution of ERA5-Land
+dem_stars <- st_warp(dem_stars, d_agg_test, use_gdal = TRUE, method = "bilinear")
 
 # dem_rast_agg <- raster::aggregate(dem_rast, fact = 4)
 # dem_terra_agg <- terra::aggregate(dem_terra, fact = 4)
 
-stations <- st_filter(climate_stations, st_as_sfc(bbox)) %>%
+stations <- st_filter(climate_stations, st_buffer(st_as_sfc(bbox), 100000)) %>%
   st_transform(st_crs(dem_stars))
 
 stations$elevation_rast <- raster::extract(dem_rast, as(stations, "Spatial"))
@@ -65,7 +72,7 @@ temp_tps <- function(df, elev_col_name = "elev_m") {
 
   fields::Tps(x = indep, Y = df$temp, miles = FALSE)
 }
-# dates <- as.Date(c("2020-08-01", "2020-08-02"))
+
 dates <- seq(min_date, max_date, by = "1 day")
 
 tic("stars")
@@ -82,24 +89,26 @@ stars_cube <- st_redimension(stars_cube, along = list(time = dates))
 names(stars_cube) <- "temp"
 toc()
 
+
+## Test plot
 ggplot(mapping = aes(fill = temp, col = temp)) +
   geom_stars(data = filter(stars_cube, time == as.Date("2020-07-01"))) +
   geom_sf(data = filter(stns_temp, date == as.Date("2020-07-01"))) +
   scale_color_viridis_c()
 
-tic("raster")
-rast_list <- lapply(dates, function(day) {
-  temp_data <- filter(all_data, date == day)
-  stns_temp <- left_join(stns_elev, temp_data, by = "stn_id")
-  mod <- temp_tps(stns_temp)
-
-  raster::interpolate(dem_rast, mod, xyOnly = FALSE)
-})
-out_rast <- brick(rast_list)
-
-out_rast <- setZ(out_rast, dates, name = "time")
-names(out_rast) <- as.character(dates)
-toc()
+# tic("raster")
+# rast_list <- lapply(dates, function(day) {
+#   temp_data <- filter(all_data, date == day)
+#   stns_temp <- left_join(stns_elev, temp_data, by = "stn_id")
+#   mod <- temp_tps(stns_temp)
+#
+#   raster::interpolate(dem_rast, mod, xyOnly = FALSE)
+# })
+# out_rast <- brick(rast_list)
+#
+# out_rast <- setZ(out_rast, dates, name = "time")
+# names(out_rast) <- as.character(dates)
+# toc()
 
 # Write as netcdf
 writeRaster(out_rast, "rast-test.nc", format = "CDF",
@@ -107,6 +116,21 @@ writeRaster(out_rast, "rast-test.nc", format = "CDF",
             varname = "temp", varunit = "degC",
             zname = "time", zunit = "days",
             overwrite = TRUE)
+
+
+stars_test <- slice(stars_cube, "time", 1)
+
+stations <- stations %>%
+  left_join(all_data %>%
+              filter(date == dates[1]) %>%
+              select(stn_id, temp),
+            by = "stn_id")
+
+stations$temp_pred <- st_extract(stars_test, stations)[["temp"]]
+stations$temp_pred_era5 <- st_extract(d_agg_test, stations)[["X00h_1vars.nc"]]
+
+
+############### Testing reading
 
 # Read in NetCDF as stars object
 stars_in <- read_stars("rast-test.nc", )
@@ -126,3 +150,12 @@ p <- ggplot(mapping = aes(fill = temp)) +
   theme(axis.text = element_blank())
 
 ggsave("test.png", p)
+
+################ Rayshader
+
+day1 <- as(filter(stars_in, time == as.Date("2020-07-01")), "Raster")
+matrix <- raster_to_matrix(day1)
+
+matrix %>%
+  height_shade(texture = viridisLite::viridis(256)) %>%
+  plot_3d(matrix)
