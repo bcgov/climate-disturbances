@@ -283,7 +283,7 @@ get_ahccd_stations <- function() {
 
   stations_file <- basename(stations_url)
 
-  download.file(stations_url, destfile = stations_file)
+  download.file(stations_url, destfile = stations_file, method = "curl")
 
   colnames <- names(readxl::read_excel(stations_file, skip = 2, n_max = 2))
 
