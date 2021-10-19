@@ -5,9 +5,13 @@ library(stars)
 library(bcmaps)
 library(dplyr)
 
-aoi <- bc_cities(ask = FALSE) %>%
-  filter(NAME == "Kamloops") %>%
-  st_buffer(dist = 200*1000) %>%
+# aoi <- bc_cities(ask = FALSE) %>%
+#   filter(NAME == "Kamloops") %>%
+#   st_buffer(dist = 200*1000) %>%
+#   st_transform(4326)
+
+aoi <- bc_bound() %>%
+  st_buffer(50000) %>%
   st_transform(4326)
 
 years <- 2020
@@ -29,6 +33,7 @@ if (!file.exists(testera)) {
 }
 
 d <- stars::read_stars(testera)
+st_crs(d) <- 4326
 
 # daily max
 agg_dates <- st_get_dimension_values(d, "time") %>%
