@@ -215,16 +215,49 @@ matrix %>%
   height_shade(texture = viridisLite::viridis(256)) %>%
   plot_3d(matrix)
 
-# Check PNWAMet
+# Check vs PNWAMet
+targets::tar_load(target_stations)
+targets::tar_load(daily_temps_stars_cube)
+targets::tar_load(analysis_temps)
 
 dat <- read_stars("data/PNWNAmet_tasmax_1990-2012.nc.nc")
 st_crs(dat) <- 4326
 
 bc_box <- bcmaps::bc_bbox(crs = 4326)
 
-dat <- dat[bc_box]
+dat <- dat[daily_temps_stars_cube]
 
-dt <- as.POSIXct("1990-06-03", tz = "UTC")
+dt <- as.POSIXct(st_get_dimension_values(daily_temps_stars_cube, "time"))
 
-filter(dat, time == dt) %>%
-  plot(downsample = c(5,5,1))
+target_stations <- target_stations %>%
+  left_join(
+    analysis_temps %>%
+      filter(date == as.Date(dt[1])) %>%
+      select(stn_id, date, temp),
+    by = "stn_id"
+  )
+
+pnwamet <- st_as_stars(filter(dat, time %in% dt))
+names(pnwamet) <- "tmax"
+
+target_stations$my_interp <- st_extract(slice(daily_temps_stars_cube, "time", 1), target_stations)[["tmax"]]
+target_stations$pnwamet_interp <- as.numeric(st_extract(slice(pnwamet, "time", 1), target_stations)[["tmax"]])
+
+target_stations <- target_stations %>%
+  mutate(diff_my_interp = abs(temp - my_interp),
+         diff_pnwamet = abs(temp - pnwamet_interp))
+
+plot(diff_my_interp~diff_pnwamet, data = target_stations)
+
+
+
+
+library(bcdata)
+lha <- bcdc_get_data(record = 'afd021d9-7722-4410-b506-d394c66e74fc',
+                     resource = 'd6e951d3-5103-475a-8bb6-b4d275e6343f')
+
+lha <- st_transform(lha, st_crs(daily_temps_stars_cube))
+
+lha$temp_agg_mine <- st_extract(slice(daily_temps_stars_cube, "time", 1), lha, FUN = mean, na.rm = TRUE)[[1]]
+lha$agg_pnwamet <- st_extract(slice(pnwamet, "time", 1), lha, FUN = mean, na.rm = TRUE)[[1]]
+
