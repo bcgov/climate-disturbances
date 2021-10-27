@@ -30,6 +30,7 @@ library(tidyhydat)
 library(heatwaveR)
 library(readxl)
 library(stars)
+library(fields)
 
 ## Other scripts
 source("R/utils.R")

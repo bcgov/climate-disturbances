@@ -62,7 +62,7 @@ climate_targets <- list(
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = analysis_temps,
                                            stations = target_stations,
                                            months = 6:9)),
-  tar_target(daily_temps_stars_cube, interpolate_daily_temps(daily_tmax_models[1:2], dem, "tmax"))
+  tar_target(daily_temps_stars_cube, interpolate_daily_temps(daily_tmax_models[1:5], dem, "tmax"))
 )
 
 # health sites
