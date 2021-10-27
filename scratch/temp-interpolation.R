@@ -214,3 +214,17 @@ matrix <- raster_to_matrix(day1)
 matrix %>%
   height_shade(texture = viridisLite::viridis(256)) %>%
   plot_3d(matrix)
+
+# Check PNWAMet
+
+dat <- read_stars("data/PNWNAmet_tasmax_1990-2012.nc.nc")
+st_crs(dat) <- 4326
+
+bc_box <- bcmaps::bc_bbox(crs = 4326)
+
+dat <- dat[bc_box]
+
+dt <- as.POSIXct("1990-06-03", tz = "UTC")
+
+filter(dat, time == dt) %>%
+  plot(downsample = c(5,5,1))

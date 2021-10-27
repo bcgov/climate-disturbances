@@ -26,9 +26,10 @@ tar_option_set(packages = .packages())
 
 # Load --------------------------------------------------------------------
 # time variables
-time_vars <- list(
-  tar_target(start_date, as.Date('1981-01-01')),
-  tar_target(end_date, Sys.Date())
+static_vars <- list(
+  tar_target(start_date, as.Date('1990-01-01')),
+  tar_target(end_date, as.Date("2020-09-30")),
+  tar_target(raster_res, 0.01) # 0.01 degrees ~ 1km
 )
 
 
@@ -51,7 +52,17 @@ climate_targets <- list(
     format = "file"
   ),
   tar_target(climate_stations, get_ahccd_stations()),
-  tar_target(target_stations, get_target_stations(climate_stations, buffer = 200))
+  tar_target(target_stations, get_bc_target_stations(climate_stations, buffer = 200, crs = sf::st_crs(dem))),
+  tar_target(dem, get_dem(res = raster_res)),
+  tar_target(analysis_temps, arrow::open_dataset(ahccd_parquet_path) %>%
+               filter(date >= start_date, date <= end_date,
+                      stn_id %in% target_stations$stn_id,
+                      measure == "daily_max") %>%
+               collect()),
+  tar_target(daily_tmax_models, model_temps_xyz(temp_data = analysis_temps,
+                                           stations = target_stations,
+                                           months = 6:9)),
+  tar_target(daily_temps_stars_cube, interpolate_daily_temps(daily_tmax_models[1:2], dem, "tmax"))
 )
 
 # health sites
@@ -79,7 +90,7 @@ health_facilities <- list(
   ## Pipeline
 
   list(
-    # time_vars,
+    static_vars,
     climate_targets,
     # processing_targets,
     # health_facilities,

@@ -29,6 +29,7 @@ library(rcaaqs) # available from GitHub https://github.com/bcgov/rcaaqs
 library(tidyhydat)
 library(heatwaveR)
 library(readxl)
+library(stars)
 
 ## Other scripts
 source("R/utils.R")

@@ -110,7 +110,7 @@ weather_stations_geo <- function(interval_var = 'day') {
 }
 
 normals_stations_geo <- function() {
-   dplyr::filter(stations, normals, prov == "BC", interval == "day")
+  dplyr::filter(stations, normals, prov == "BC", interval == "day")
 }
 
 weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL, interval_var = 'day', normals, ask = TRUE) {
@@ -165,18 +165,26 @@ download_ahccd_data <- function(data_dir = "data") {
   which_file <- grepl("daily_max_temp|daily_mean_temp|daily_min_temp", files_df$Name) & grepl("2020", files_df$Name) & tools::file_ext(files_df$Name) == "zip"
   fname <- files_df$Name[which_file]
 
-  vapply(fname, function(n) {
+  data_dir <- normalizePath(file.path(data_dir, "ahccd_sources"), mustWork = FALSE)
+  dir.create(data_dir, showWarnings = FALSE)
+
+  ret <- vapply(fname, function(n) {
     url <- paste0(base_url, "/", n)
     destfile <- file.path(data_dir, n)
     download.file(url, destfile = destfile)
     destfile
   }, FUN.VALUE = character(1), USE.NAMES = FALSE)
+
+  attr(ret, "timestamp") <- as.character(Sys.time())
+  ret
 }
 
 extract_ahccd_data <- function(zipfile, save_raw_txt = FALSE, data_dir) {
   exdir <- ifelse(save_raw_txt, file.path(data_dir, "raw_txt"), tempdir())
   if (!dir.exists(exdir)) dir.create(exdir, recursive = TRUE)
-  unzip(zipfile, exdir = exdir)
+  ret <- unzip(zipfile, exdir = exdir)
+  attr(ret, "timestamp") <- as.character(Sys.time())
+  ret
 }
 
 read_ahccd_data_single <- function(datafile) {
@@ -238,7 +246,8 @@ read_ahccd_data_single <- function(datafile) {
       element == "Homogenized daily mean temperature" ~ "daily_mean",
       TRUE ~ NA_character_
     ),
-    temp = as.numeric(gsub("[a-zA-Z]", "", temp))
+    temp = as.numeric(gsub("[a-zA-Z]", "", temp)),
+    temp = ifelse(temp < -9000, NA_real_, temp)
   )
 
   data %>%
@@ -249,7 +258,7 @@ read_ahccd_data_single <- function(datafile) {
 }
 
 write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
-                           data_dir = "data/AHCCD_data") {
+                             data_dir = "data") {
 
   stopifnot(length(zipfiles) == 3L)
   stopifnot(all(file.exists(zipfiles)))
@@ -259,10 +268,20 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
     files
   })
 
-  message("Writing parquet files for ", length(fpaths[[1]]),
+  data_dir <- normalizePath(data_dir, mustWork = TRUE)
+
+  parquet_path <- file.path(data_dir, "AHCCD_data", "parquet")
+
+  if (dir.exists(parquet_path)) {
+    del <- unlink(parquet_path, recursive = TRUE, force = TRUE)
+    if (!del) stop("unable to delete existing directory: ", parquet_path)
+  }
+
+  dir.create(parquet_path, recursive = TRUE, showWarnings = FALSE)
+
+  message("Writing parquet files in ", parquet_path, "for ", length(fpaths[[1]]),
           " stations, partitioning by stn_id, measure, and year")
 
-  parquet_path <- file.path(data_dir, "parquet")
 
   # this could be done in parallel
   purrr::pwalk(fpaths, function(x, y, z) {
@@ -271,17 +290,20 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
     d3 <- read_ahccd_data_single(z)
 
     d <- dplyr::bind_rows(d1, d2, d3)
-    d <- dplyr::group_by(d, stn_id, measure, year)
+    d <- dplyr::group_by(d, stn_id, year, measure)
     arrow::write_dataset(d, parquet_path, format = "parquet")
   })
 
+  attr(parquet_path, "timestamp") <- as.character(Sys.time())
   parquet_path
 }
 
 get_ahccd_stations <- function() {
   stations_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily/Homog_Temperature_Stations_Gen3.xls"
 
-  stations_file <- basename(stations_url)
+  stations_file <- normalizePath(file.path("data", "ahccd_sources", basename(stations_url)),
+                                 mustWork = FALSE)
+  dir.create(dirname(stations_file), showWarnings = FALSE)
 
   download.file(stations_url, destfile = stations_file, method = "curl")
 
@@ -292,15 +314,74 @@ get_ahccd_stations <- function() {
   stations <- stations %>%
     janitor::clean_names() %>%
     dplyr::mutate(from = paste(from, x6, sep = "-"),
-           to = paste(to, x8, sep = "-")) %>%
+                  to = paste(to, x8, sep = "-")) %>%
     dplyr::select(-x6, -x8)
 
   sf::st_as_sf(stations, coords = c("long_deg", "lat_deg"), crs = 4326)
 }
 
-get_target_stations <- function(stations, buffer) {
+get_bc_target_stations <- function(stations, buffer, crs) {
   bc_buff <- sf::st_buffer(st_union(bcmaps::bc_bound()), dist = buffer * 1000)
   stations <- sf::st_transform(stations, sf::st_crs(bc_buff))
   stations <- sf::st_intersection(stations, bc_buff, sparse = FALSE)
-  stations
+  sf::st_transform(stations, crs)
+}
+
+get_dem <- function(aoi = NULL, res) {
+  if (is.null(aoi)) {
+    aoi <- bcmaps::bc_bound() %>%
+      sf::st_buffer(50000) %>%
+      sf::st_transform(4326)
+  }
+
+  vrt <- bcmaps::cded(aoi, check_tiles = FALSE, ask = FALSE)
+  dem_stars <- stars::read_stars(vrt)
+  dem_stars_out <- stars::st_warp(
+    dem_stars,
+    stars::st_as_stars(sf::st_bbox(aoi), dx = res),
+    method = "bilinear", use_gdal = TRUE
+  )
+  fname <- paste0("data/dem_stars_", as.character(res), ".tif")
+  stars::write_stars(dem_stars_out, fname)
+  stars::read_stars(fname)
+}
+
+model_temps_xyz <- function(temp_data, stations, months) {
+  temp_data <- temp_data %>%
+    dplyr::filter(month %in% months)
+
+  stations <- cbind(sf::st_drop_geometry(stations),
+                    sf::st_coordinates(stations)) %>%
+    dplyr::select(stn_id, x = X, y = Y, elevation = elev_m)
+
+  days <- unique(temp_data$date)
+
+  out <- lapply(days, function(d) {
+    data <- temp_data[temp_data$date == d, , drop = FALSE]
+    df <- dplyr::left_join(stations, data, by = "stn_id") %>%
+      dplyr::select(x, y, elevation, temp)
+    temp_tps(df)
+  })
+
+  stats::setNames(out, as.character(days))
+}
+
+temp_tps <- function(df) {
+  df <- na.omit(df)
+  indep <- df[, c("x", "y", "elevation")]
+
+  fields::Tps(x = indep, Y = df$temp, miles = FALSE)
+}
+
+interpolate_daily_temps <- function(model_list, dem, variable) {
+  stars_list <- lapply(model_list, function(mod) {
+    predict(dem, mod)
+  })
+
+  dates <- as.Date(names(model_list))
+
+  stars_cube <- do.call("c", stars_list)
+  stars_cube <- stars::st_redimension(stars_cube, along = list(time = dates))
+  names(stars_cube) <- variable
+  stars_cube
 }
