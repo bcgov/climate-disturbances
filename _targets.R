@@ -29,14 +29,16 @@ tar_option_set(packages = .packages())
 static_vars <- list(
   tar_target(start_date, as.Date('1990-01-01')),
   tar_target(end_date, as.Date("2020-09-30")),
-  tar_target(raster_res, 0.01) # 0.01 degrees ~ 1km
+  tar_target(raster_res, 0.05) # 0.01 degrees ~ 1km
 )
 
 
 #  climate data
 climate_targets <- list(
-  # tar_target(area_of_interest, health_lha() %>% filter(grepl("Vancouver", LOCAL_HLTH_AREA_NAME, ignore.case = TRUE) |
-  #                                                      LOCAL_HLTH_AREA_NAME %in% c("Greater Nanaimo", "Kamloops", "Smithers", "Nelson", "Central Okanagan", "Greater Victoria"))),
+  tar_target(area_of_interest,
+             health_lha() %>%
+               filter(LOCAL_HLTH_AREA_NAME %in% c("Greater Nanaimo", "Kamloops", "Central Okanagan", "Greater Victoria")) %>%
+               st_transform(st_crs(dem))),
   # #tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)), ##pm data has some issues with arrow col specs
   # tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = FALSE, ask = FALSE)),
   # tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
@@ -61,8 +63,11 @@ climate_targets <- list(
                collect()),
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = analysis_temps,
                                            stations = target_stations,
-                                           months = 6:9)),
-  tar_target(daily_temps_stars_cube, interpolate_daily_temps(daily_tmax_models[1:5], dem, "tmax"))
+                                           months = 4:9)),
+  tar_target(daily_temps_stars_cube,
+             interpolate_daily_temps(daily_tmax_models[1:2],
+                                     dem[area_of_interest], "tmax")),
+  tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube), format = "file")
 )
 
 # health sites

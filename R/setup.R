@@ -31,6 +31,7 @@ library(heatwaveR)
 library(readxl)
 library(stars)
 library(fields)
+library(raster)
 
 ## Other scripts
 source("R/utils.R")

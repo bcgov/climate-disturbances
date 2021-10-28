@@ -343,7 +343,7 @@ get_dem <- function(aoi = NULL, res) {
   )
   fname <- paste0("data/dem_stars_", as.character(res), ".tif")
   stars::write_stars(dem_stars_out, fname)
-  stars::read_stars(fname)
+  stars::read_stars(fname, proxy = FALSE)
 }
 
 model_temps_xyz <- function(temp_data, stations, months) {
@@ -384,4 +384,19 @@ interpolate_daily_temps <- function(model_list, dem, variable) {
   stars_cube <- stars::st_redimension(stars_cube, along = list(time = dates))
   names(stars_cube) <- variable
   stars_cube
+}
+
+write_ncdf <- function(cube, dir = "data/out") {
+  name <- paste0(deparse(substitute(cube)), ".nc")
+  out_rast <- as(cube, "Raster")
+
+  path <- file.path(dir, name)
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  # Write as netcdf
+  raster::writeRaster(out_rast, path, format = "CDF",
+              xname = "x", yname = "y",
+              varname = "temp", varunit = "degC",
+              zname = "time", zunit = "days",
+              overwrite = TRUE)
+  path
 }
