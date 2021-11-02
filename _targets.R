@@ -65,7 +65,7 @@ climate_targets <- list(
                                            stations = target_stations,
                                            months = 4:9)),
   tar_target(daily_temps_stars_cube,
-             interpolate_daily_temps(daily_tmax_models[1:2],
+             interpolate_daily_temps(daily_tmax_models,
                                      dem[area_of_interest], "tmax")),
   tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube), format = "file")
 )
