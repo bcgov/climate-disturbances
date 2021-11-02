@@ -2,8 +2,11 @@ library(targets)
 library(dplyr)
 library(stars)
 library(heatwaveR)
+library(tidyr)
+library(sf)
 
 tar_load(daily_temps_stars_cube)
+tar_load(area_of_interest)
 
 # check how many valid pixels are in each time slice:
 not_na_pixels <- !is.na(daily_temps_stars_cube$tmax)
@@ -40,8 +43,32 @@ lapply(all_temps_split, \(x) {
   tar_assert_identical(nrow(x), num_times)
 })
 
-clims <- lapply(all_temps_split[1:20], ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"))
+clims <- lapply(all_temps_split, ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"))
 events <- lapply(clims, detect_event, minDuration = 3)
+
+events_daily <- lapply(names(events), \(x) {
+  event <- events[[x]]$climatology
+  event$pixel_id <- x
+  event[c("pixel_id", setdiff(names(event), "pixel_id"))]
+}) %>%
+  bind_rows() %>%
+  tidyr::separate(pixel_id, into = c("x", "y"), ";", remove = FALSE, convert = TRUE) %>%
+  filter(event == TRUE)
+
+events_summary <- lapply(names(events), \(x) {
+  event <- events[[x]]$event
+  event$pixel_id <- x
+  event[c("pixel_id", setdiff(names(event), "pixel_id"))]
+}) %>%
+  bind_rows() %>%
+  tidyr::separate(pixel_id, into = c("x", "y"), ";", remove = FALSE,convert = TRUE)
+
+filter(events_daily, t == as.Date("1998-07-25")) %>%
+  select(x, y, temp) %>%
+  st_as_sf(coords = c("x", "y"), crs = 4326) %>%
+  plot(reset = FALSE)
+
+plot(st_geometry(st_transform(area_of_interest, 4326)), border = "red", add = TRUE)
 
 # test <- all_temps_split[[6883]]
 #
