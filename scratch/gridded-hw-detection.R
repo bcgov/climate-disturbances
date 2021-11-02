@@ -5,6 +5,14 @@ library(heatwaveR)
 
 tar_load(daily_temps_stars_cube)
 
+# check how many valid pixels are in each time slice:
+not_na_pixels <- !is.na(daily_temps_stars_cube$tmax)
+num_pixels_per_slice <- apply(not_na_pixels, 3, sum)
+tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
+num_pixels <- min(num_pixels_per_slice)
+
+num_times <- length(st_get_dimension_values(daily_temps_stars_cube, "time"))
+
 # event_only <- function(df){
 #   # First calculate the climatologies
 #   clim <- ts2clm(data = df, climatologyPeriod = c("1990-04-01", "2020-01-01"))
@@ -17,28 +25,22 @@ tar_load(daily_temps_stars_cube)
 all_temps <- as.data.frame(daily_temps_stars_cube) %>%
   mutate(time = as.Date(time)) %>%
   rename(t = time, temp = tmax) %>%
-  filter(!is.na(temp)) # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
-
+  filter(!is.na(temp)) %>% # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
+  mutate(pixel_id = paste(x, y, sep = ";"))
 # system.time(
 #   events <- all_temps %>%
 #     group_by(x, y) %>%
 #     group_modify(~event_only(.x))
 # )
 
-all_temps_split <- split(all_temps, list(all_temps$x, all_temps$y))
+all_temps_split <- split(all_temps, all_temps$pixel_id)
+tar_assert_identical(length(all_temps_split), num_pixels)
 
-i <- sapply(all_temps_split, \(x) !all(is.na(x$temp)))
-# which(i)
-# choose 7728:7732 to test
-i[7728:7732]
-names(i[7728:7732])
-dput(names(i[7728:7732]))
-#
-# c("-119.633204534209,51.4758720589969", "-119.583204534209,51.4758720589969",
-#   "-119.533204534209,51.4758720589969", "-119.483204534209,51.4758720589969",
-#   "-119.433204534209,51.4758720589969")
+lapply(all_temps_split, \(x) {
+  tar_assert_identical(nrow(x), num_times)
+})
 
-clims <- lapply(all_temps_split[7728:7732], ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"))
+clims <- lapply(all_temps_split[1:20], ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"))
 events <- lapply(clims, detect_event, minDuration = 3)
 
 # test <- all_temps_split[[6883]]
