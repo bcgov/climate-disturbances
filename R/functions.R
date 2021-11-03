@@ -216,7 +216,7 @@ read_ahccd_data_single <- function(datafile) {
   )
 
   for (i in seq_along(stn_meta)) {
-    data[[names(stn_meta)[i]]] <- stn_meta[i]
+    data[[names(stn_meta)[i]]] <- unname(stn_meta[i])
   }
 
   data <- tidyr::pivot_longer(data, cols = starts_with("Day"),
@@ -263,7 +263,7 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
   stopifnot(length(zipfiles) == 3L)
   stopifnot(all(file.exists(zipfiles)))
 
-  fpaths <- lapply(zipfiles, function(n) {
+  fpaths <- future.apply::future_lapply(zipfiles, function(n) {
     files <- extract_ahccd_data(n, save_raw_txt = save_raw_txt, data_dir = data_dir)
     files
   })
@@ -280,11 +280,11 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
   dir.create(parquet_path, recursive = TRUE, showWarnings = FALSE)
 
   message("Writing parquet files in ", parquet_path, "for ", length(fpaths[[1]]),
-          " stations, partitioning by stn_id, measure, and year")
+          " stations, partitioning by stn_id, year, and measure")
 
 
   # this could be done in parallel
-  purrr::pwalk(fpaths, function(x, y, z) {
+  furrr::future_pwalk(fpaths, function(x, y, z) {
     d1 <- read_ahccd_data_single(x)
     d2 <- read_ahccd_data_single(y)
     d3 <- read_ahccd_data_single(z)
@@ -356,12 +356,12 @@ model_temps_xyz <- function(temp_data, stations, months) {
 
   days <- unique(temp_data$date)
 
-  out <- lapply(days, function(d) {
+  out <- future.apply::future_lapply(days, function(d) {
     data <- temp_data[temp_data$date == d, , drop = FALSE]
     df <- dplyr::left_join(stations, data, by = "stn_id") %>%
       dplyr::select(x, y, elevation, temp)
     temp_tps(df)
-  })
+  }, future.seed = 13L)
 
   stats::setNames(out, as.character(days))
 }
@@ -374,9 +374,9 @@ temp_tps <- function(df) {
 }
 
 interpolate_daily_temps <- function(model_list, dem, variable) {
-  stars_list <- lapply(model_list, function(mod) {
+  stars_list <- future.apply::future_lapply(model_list, function(mod) {
     predict(dem, mod)
-  })
+  }, future.packages = c("fields", "stars"))
 
   dates <- as.Date(names(model_list))
 

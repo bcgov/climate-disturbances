@@ -22,6 +22,7 @@ source("R/setup.R")
 ## Load packages
 tar_option_set(packages = .packages())
 
+future::plan(multisession(workers = 6))
 
 
 # Load --------------------------------------------------------------------
@@ -29,7 +30,26 @@ tar_option_set(packages = .packages())
 static_vars <- list(
   tar_target(start_date, as.Date('1990-01-01')),
   tar_target(end_date, as.Date("2020-09-30")),
-  tar_target(raster_res, 0.05) # 0.01 degrees ~ 1km
+  tar_target(raster_res, 0.05), # 0.01 degrees ~ 1km
+  tar_target(LHAs, c("Greater Nanaimo",
+                     "Kamloops",
+                     "Central Okanagan",
+                     "Greater Victoria",
+                     "Langley",
+                     "Surrey",
+                     "South Surrey/White Rock",
+                     "New Westminster",
+                     "Delta",
+                     "Burnaby",
+                     "Richmond",
+                     "Vancouver - City Centre",
+                     "Vancouver - South",
+                     "Vancouver - Westside",
+                     "Vancouver - Midtown",
+                     "Vancouver - Centre North",
+                     "Vancouver - Northeast",
+                     "West Vancouver/Bowen Island",
+                     "North Vancouver"))
 )
 
 
@@ -37,7 +57,7 @@ static_vars <- list(
 climate_targets <- list(
   tar_target(area_of_interest,
              health_lha() %>%
-               filter(LOCAL_HLTH_AREA_NAME %in% c("Greater Nanaimo", "Kamloops", "Central Okanagan", "Greater Victoria")) %>%
+               filter(LOCAL_HLTH_AREA_NAME %in% LHAs) %>%
                st_transform(st_crs(dem))),
   # #tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)), ##pm data has some issues with arrow col specs
   # tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = FALSE, ask = FALSE)),
@@ -59,9 +79,9 @@ climate_targets <- list(
   tar_target(analysis_temps, arrow::open_dataset(ahccd_parquet_path) %>%
                filter(date >= start_date, date <= end_date,
                       stn_id %in% target_stations$stn_id,
-                      measure == "daily_max") %>%
+                      measure %in% c("daily_max", "daily_min")) %>%
                collect()),
-  tar_target(daily_tmax_models, model_temps_xyz(temp_data = analysis_temps,
+  tar_target(daily_tmax_models, model_temps_xyz(temp_data = filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
                                            months = 4:9)),
   tar_target(daily_temps_stars_cube,

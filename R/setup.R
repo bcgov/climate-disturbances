@@ -32,6 +32,9 @@ library(readxl)
 library(stars)
 library(fields)
 library(raster)
+library(future)
+library(future.apply)
+library(furrr)
 
 ## Other scripts
 source("R/utils.R")
