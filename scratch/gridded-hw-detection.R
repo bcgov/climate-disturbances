@@ -4,6 +4,10 @@ library(stars)
 library(heatwaveR)
 library(tidyr)
 library(sf)
+library(future)
+library(future.apply)
+
+plan(multisession(workers = availableCores() - 1))
 
 tar_load(daily_temps_stars_cube)
 tar_load(area_of_interest)
@@ -15,15 +19,6 @@ tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
 num_pixels <- min(num_pixels_per_slice)
 
 num_times <- length(st_get_dimension_values(daily_temps_stars_cube, "time"))
-
-# event_only <- function(df){
-#   # First calculate the climatologies
-#   clim <- ts2clm(data = df, climatologyPeriod = c("1990-04-01", "2020-01-01"))
-#   # Then the events
-#   event <- detect_event(data = clim)
-#   # Return only the event metric dataframe of results
-#   return(event$event)
-# }
 
 all_temps <- as.data.frame(daily_temps_stars_cube) %>%
   mutate(time = as.Date(time)) %>%
@@ -43,10 +38,10 @@ lapply(all_temps_split, \(x) {
   tar_assert_identical(nrow(x), num_times)
 })
 
-clims <- lapply(all_temps_split, ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"))
-events <- lapply(clims, detect_event, minDuration = 3)
+clims <- future_lapply(all_temps_split, ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"), future.seed = 13L)
+events <- future_lapply(clims, detect_event, minDuration = 3, future.seed = 13L)
 
-events_daily <- lapply(names(events), \(x) {
+events_daily <- future_lapply(names(events), \(x) {
   event <- events[[x]]$climatology
   event$pixel_id <- x
   event[c("pixel_id", setdiff(names(event), "pixel_id"))]
@@ -55,7 +50,7 @@ events_daily <- lapply(names(events), \(x) {
   tidyr::separate(pixel_id, into = c("x", "y"), ";", remove = FALSE, convert = TRUE) %>%
   filter(event == TRUE)
 
-events_summary <- lapply(names(events), \(x) {
+events_summary <- future_lapply(names(events), \(x) {
   event <- events[[x]]$event
   event$pixel_id <- x
   event[c("pixel_id", setdiff(names(event), "pixel_id"))]
