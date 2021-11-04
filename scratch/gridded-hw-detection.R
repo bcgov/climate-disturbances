@@ -25,11 +25,18 @@ all_temps <- as.data.frame(daily_temps_stars_cube) %>%
   rename(t = time, temp = tmax) %>%
   filter(!is.na(temp)) %>% # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
   mutate(pixel_id = paste(x, y, sep = ";"))
-# system.time(
-#   events <- all_temps %>%
-#     group_by(x, y) %>%
-#     group_modify(~event_only(.x))
-# )
+
+# Assign each pixel to an LHA
+lha_pixel_points <- all_temps %>%
+  dplyr::select(pixel_id, x, y) %>%
+  distinct() %>%
+  st_as_sf(coords = c("x", "y"), crs = 4326) %>%
+  st_join(st_transform(bcmaps::health_lha(), 4326) %>%
+            dplyr::select(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME))
+
+lha_pixels <- st_drop_geometry(lha_pixel_points) %>%
+  group_by(LOCAL_HLTH_AREA_CODE) %>%
+  summarise(n_lha_pixels = n())
 
 all_temps_split <- split(all_temps, all_temps$pixel_id)
 tar_assert_identical(length(all_temps_split), num_pixels)
@@ -38,30 +45,60 @@ lapply(all_temps_split, \(x) {
   tar_assert_identical(nrow(x), num_times)
 })
 
-clims <- future_lapply(all_temps_split, ts2clm, climatologyPeriod = c("1990-04-01", "2020-01-01"), future.seed = 13L)
-events <- future_lapply(clims, detect_event, minDuration = 3, future.seed = 13L)
+# Calculate climatologies
+clims <- future_lapply(all_temps_split, ts2clm,
+                       climatologyPeriod = c("1990-04-01", "2020-01-01"),
+                       future.seed = 13L)
 
-events_daily <- future_lapply(names(events), \(x) {
+# Add 30C minimum threshold as new column (logical)
+clims <- lapply(clims, \(x) {x$thresh2 <- x$temp >= 30; x})
+
+# Detect events based on climatology
+events <- future_lapply(clims, \(x) {
+  detect_event(x, minDuration = 2, threshClim2 = x$thresh2)
+}, future.seed = 13L)
+
+events_daily <- lapply(names(events), \(x) {
   event <- events[[x]]$climatology
   event$pixel_id <- x
   event[c("pixel_id", setdiff(names(event), "pixel_id"))]
 }) %>%
   bind_rows() %>%
-  tidyr::separate(pixel_id, into = c("x", "y"), ";", remove = FALSE, convert = TRUE) %>%
+  tidyr::separate(pixel_id, into = c("x", "y"), ";",
+                  remove = FALSE, convert = TRUE) %>%
   filter(event == TRUE)
 
-events_summary <- future_lapply(names(events), \(x) {
+# calcualte HW stats by LHA by date.
+# TODO - min/max/sd of temps
+# TODO - rename appropriate columns and input into detect_event for LHA-level event summary
+daily_lha_event_summary <- events_daily %>%
+  left_join(st_drop_geometry(lha_pixel_points), by = "pixel_id") %>%
+  group_by(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME, t, doy) %>%
+  summarise(mean_temp = mean(temp, na.rm = TRUE),
+            mean_seas = mean(seas, na.rm = TRUE),
+            mean_thresh = mean(thresh, na.rm = TRUE),
+            n = n()) %>%
+  left_join(lha_pixels) %>%
+  mutate(percent_pixels = (n / n_lha_pixels) * 100)
+
+events_summary_by_pixel <- lapply(names(events), \(x) {
   event <- events[[x]]$event
   event$pixel_id <- x
   event[c("pixel_id", setdiff(names(event), "pixel_id"))]
 }) %>%
   bind_rows() %>%
-  tidyr::separate(pixel_id, into = c("x", "y"), ";", remove = FALSE,convert = TRUE)
+  tidyr::separate(pixel_id, into = c("x", "y"), ";",
+                  remove = FALSE, convert = TRUE) %>%
+  left_join(st_drop_geometry(lha_pixel_points), by = "pixel_id")
 
-filter(events_daily, t == as.Date("1998-07-25")) %>%
-  select(x, y, temp) %>%
+filter(events_daily, t == as.Date("1995-06-28")) %>%
+  dplyr::select(x, y, temp) %>%
   st_as_sf(coords = c("x", "y"), crs = 4326) %>%
-  plot(reset = FALSE)
+  as("Spatial") %>%
+  raster::rasterize(field = "temp",
+                    as(slice(daily_temps_stars_cube, "time", 1), "Raster")) %>%
+  st_as_stars() %>%
+  plot(col = inferno(12), reset = FALSE)
 
 plot(st_geometry(st_transform(area_of_interest, 4326)), border = "red", add = TRUE)
 
