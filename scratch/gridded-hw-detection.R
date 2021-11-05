@@ -99,6 +99,7 @@ daily_lha_clim_summary <- events_clim_daily  %>%
   ungroup()
 
 # Use LHA summary to identify exceedance events > 30 degrees, min 2 days
+# TODO: Decide to use detect_event or exceedance
 lha_events <- daily_lha_clim_summary %>%
   select(LOCAL_HLTH_AREA_CODE,
          t, temp = mean_temp, seas = mean_seas,
@@ -106,9 +107,11 @@ lha_events <- daily_lha_clim_summary %>%
   split(.$LOCAL_HLTH_AREA_CODE) %>%
   lapply(\(x) exceedance(x, threshold = 30, minDuration = 2))
 
+# LHA heatwaves - long table by date
 lha_events_by_date <- lapply(lha_events, `[[`, "threshold") %>%
   bind_rows(.id = "LOCAL_HLTH_AREA_CODE")
 
+# LHA heatwave summaries
 lha_events_summary <- lapply(lha_events, `[[`, "exceedance") %>%
   bind_rows(.id = "LOCAL_HLTH_AREA_CODE")
 
