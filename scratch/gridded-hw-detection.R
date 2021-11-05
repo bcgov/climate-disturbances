@@ -6,6 +6,7 @@ library(tidyr)
 library(sf)
 library(future)
 library(future.apply)
+library(viridisLite)
 
 plan(multisession(workers = availableCores() - 1))
 
@@ -20,6 +21,7 @@ num_pixels <- min(num_pixels_per_slice)
 
 num_times <- length(st_get_dimension_values(daily_temps_stars_cube, "time"))
 
+# Long data frame of tmax for every pixel for every date
 all_temps <- as.data.frame(daily_temps_stars_cube) %>%
   mutate(time = as.Date(time)) %>%
   rename(t = time, temp = tmax) %>%
@@ -34,6 +36,7 @@ lha_pixel_points <- all_temps %>%
   st_join(st_transform(bcmaps::health_lha(), 4326) %>%
             dplyr::select(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME))
 
+# Lookup table of pixels and LHAs
 lha_pixels <- st_drop_geometry(lha_pixel_points) %>%
   group_by(LOCAL_HLTH_AREA_CODE) %>%
   summarise(n_lha_pixels = n())
@@ -45,41 +48,69 @@ lapply(all_temps_split, \(x) {
   tar_assert_identical(nrow(x), num_times)
 })
 
-# Calculate climatologies
-clims <- future_lapply(all_temps_split, ts2clm,
+# Calculate climatologies for each pixel
+pixel_clims_list <- future_lapply(all_temps_split, ts2clm,
                        climatologyPeriod = c("1990-04-01", "2020-01-01"),
                        future.seed = 13L)
 
-# Add 30C minimum threshold as new column (logical)
-clims <- lapply(clims, \(x) {x$thresh2 <- x$temp >= 30; x})
+pixel_clims <- bind_rows(pixel_clims_list, .id = "pixel_id")
 
-# Detect events based on climatology
-events <- future_lapply(clims, \(x) {
-  detect_event(x, minDuration = 2, threshClim2 = x$thresh2)
+# Add 30C minimum threshold to climatologies as new column (logical)
+pixel_clims_list <- lapply(pixel_clims_list, \(x) {x$thresh2 <- x$temp >= 30; x})
+
+# Detect events at each pixel based on climatology and a static 30 degree threshold
+events <- future_lapply(pixel_clims_list, \(x) {
+  detect_event(x, minDuration = 2) #, threshClim2 = x$thresh2)
 }, future.seed = 13L)
 
-events_daily <- lapply(names(events), \(x) {
+# Extract the long day-by-day identification of heatwaves at each pixel
+events_clim_daily <- future_lapply(names(events), \(x) {
   event <- events[[x]]$climatology
   event$pixel_id <- x
-  event[c("pixel_id", setdiff(names(event), "pixel_id"))]
+  event[c("pixel_id", setdiff(names(event), "pixel_id"))] %>%
+    tidyr::separate(pixel_id, into = c("x", "y"), ";",
+                    remove = FALSE, convert = TRUE)
 }) %>%
-  bind_rows() %>%
-  tidyr::separate(pixel_id, into = c("x", "y"), ";",
-                  remove = FALSE, convert = TRUE) %>%
-  filter(event == TRUE)
+  bind_rows()
 
-# calcualte HW stats by LHA by date.
-# TODO - min/max/sd of temps
-# TODO - rename appropriate columns and input into detect_event for LHA-level event summary
-daily_lha_event_summary <- events_daily %>%
+# calculate climatology stats by LHA by date.
+daily_lha_clim_summary <- events_clim_daily  %>%
   left_join(st_drop_geometry(lha_pixel_points), by = "pixel_id") %>%
   group_by(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME, t, doy) %>%
   summarise(mean_temp = mean(temp, na.rm = TRUE),
+            median_temp = median(temp, na.rm = TRUE),
             mean_seas = mean(seas, na.rm = TRUE),
+            median_seas = median(seas, na.rm = TRUE),
             mean_thresh = mean(thresh, na.rm = TRUE),
-            n = n()) %>%
-  left_join(lha_pixels) %>%
-  mutate(percent_pixels = (n / n_lha_pixels) * 100)
+            median_thresh = median(thresh, na.rm = TRUE),
+            max_temp = max(temp, na.rm = TRUE),
+            max_seas = max(seas, na.rm = TRUE),
+            max_thresh = max(thresh, na.rm = TRUE),
+            min_temp = min(temp, na.rm = TRUE),
+            min_seas = min(seas, na.rm = TRUE),
+            min_thresh = min(thresh, na.rm = TRUE),
+            sd_temp = sd(temp, na.rm = TRUE),
+            sd_seas = sd(seas, na.rm = TRUE),
+            sd_thresh = sd(thresh, na.rm = TRUE),
+            n = n(),
+            percent_event = sum(event, na.rm = TRUE) / n,
+            percent_thresh = sum(threshCriterion, na.rm = TRUE) / n,
+            percent_duration = sum(durationCriterion, na.rm = TRUE) / n) %>%
+  ungroup()
+
+# Use LHA summary to identify exceedance events > 30 degrees, min 2 days
+lha_events <- daily_lha_clim_summary %>%
+  select(LOCAL_HLTH_AREA_CODE,
+         t, temp = mean_temp, seas = mean_seas,
+         thresh = mean_thresh) %>%
+  split(.$LOCAL_HLTH_AREA_CODE) %>%
+  lapply(\(x) exceedance(x, threshold = 30, minDuration = 2))
+
+lha_events_by_date <- lapply(lha_events, `[[`, "threshold") %>%
+  bind_rows(.id = "LOCAL_HLTH_AREA_CODE")
+
+lha_events_summary <- lapply(lha_events, `[[`, "exceedance") %>%
+  bind_rows(.id = "LOCAL_HLTH_AREA_CODE")
 
 events_summary_by_pixel <- lapply(names(events), \(x) {
   event <- events[[x]]$event
@@ -91,7 +122,7 @@ events_summary_by_pixel <- lapply(names(events), \(x) {
                   remove = FALSE, convert = TRUE) %>%
   left_join(st_drop_geometry(lha_pixel_points), by = "pixel_id")
 
-filter(events_daily, t == as.Date("1995-06-28")) %>%
+filter(events_clim_daily, t == as.Date("2009-07-29")) %>%
   dplyr::select(x, y, temp) %>%
   st_as_sf(coords = c("x", "y"), crs = 4326) %>%
   as("Spatial") %>%
