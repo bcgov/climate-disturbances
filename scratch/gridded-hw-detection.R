@@ -95,7 +95,7 @@ daily_lha_clim_summary <- events_clim_daily  |>
             n = n(),
             across(.cols = c(event, threshCriterion, durationCriterion),
                    .fns = ~ sum(as.numeric(.x), na.rm = TRUE) / n,
-            .names = "{.col}_percent"))
+            .names = "{.col}_percent")) |>
   ungroup()
 
 # Use LHA summary to identify events > 30 degrees, min 2 days

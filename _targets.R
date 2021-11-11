@@ -90,6 +90,11 @@ climate_targets <- list(
   tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube), format = "file")
 )
 
+heatwave_targets <- list(
+  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube)),
+  tar_target(pixel_lha, pixel_lha_lookup(daily_temps_stars_cube, area_of_interest))
+)
+
 # health sites
 health_facilities <- list(
   tar_target(hospitals, bcdc_query_geodata("bc-health-care-facilities-hospital") %>%
@@ -117,6 +122,7 @@ health_facilities <- list(
   list(
     static_vars,
     climate_targets,
+    heatwave_targets,
     # processing_targets,
     # health_facilities,
     #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),

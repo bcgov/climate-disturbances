@@ -157,7 +157,7 @@ weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date 
 
 }
 
-########### Homogenized daily temps
+########### Create temperature surfaces
 
 download_ahccd_data <- function(data_dir = "data") {
   base_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily"
@@ -399,4 +399,46 @@ write_ncdf <- function(cube, dir = "data/out") {
               zname = "time", zunit = "days",
               overwrite = TRUE)
   path
+}
+
+##### Heatwave detection
+
+generate_pixel_climatologies <- function(stars_cube) {
+  not_na_pixels <- !is.na(stars_cube$tmax)
+  num_pixels_per_slice <- apply(not_na_pixels, 3, sum)
+  targets::tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
+  num_pixels <- min(num_pixels_per_slice)
+
+  num_times <- length(stars::st_get_dimension_values(stars_cube, "time"))
+
+  # Long data frame of tmax for every pixel for every date
+  all_temps <- as.data.frame(stars_cube) |>
+    dplyr::mutate(time = as.Date(time)) |>
+    dplyr::rename(t = time, temp = tmax) |>
+    dplyr::filter(!is.na(temp)) |> # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
+    dplyr::mutate(pixel_id = paste(x, y, sep = ";"))
+
+  all_temps_split <- split(all_temps, all_temps$pixel_id)
+  targets::tar_assert_identical(length(all_temps_split), num_pixels)
+
+  lapply(all_temps_split, \(x) {
+    targets::tar_assert_identical(nrow(x), num_times)
+  })
+
+  # Calculate climatologies for each pixel
+  future.apply::future_lapply(all_temps_split, heatwaveR::ts2clm,
+                climatologyPeriod = c("1990-04-01", "2020-01-01"),
+                future.seed = 13L)
+}
+
+pixel_lha_lookup <- function(stars_cube, area_of_interest) {
+  rast <- dplyr::slice(stars_cube, "time", 1)
+  pixels <- as.data.frame(rast) |>
+    dplyr::select(-tmax) |>
+    dplyr::mutate(pixel_id = paste(x, y, sep = ";")) |>
+    sf::st_as_sf(coords = c("x", "y"), crs = st_crs(stars_cube)) |>
+    sf::st_join(
+      dplyr::select(area_of_interest,
+                    LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME)
+      )
 }
