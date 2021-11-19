@@ -44,9 +44,9 @@ dir.create(hw_output_dir, showWarnings = FALSE, recursive = TRUE)
 # Load --------------------------------------------------------------------
 # time variables
 static_vars <- list(
-  tar_target(start_date, as.Date('1990-01-01')),
+  tar_target(start_date, as.Date('1990-04-01')),
   tar_target(end_date, as.Date("2020-09-30")),
-  tar_target(raster_res, 0.05), # 0.01 degrees ~ 1km
+  tar_target(raster_res, 0.05), # 0.05 degrees ~ 5km
   tar_target(LHAs, c("Greater Nanaimo",
                      "Kamloops",
                      "Central Okanagan",
@@ -103,12 +103,39 @@ climate_targets <- list(
   tar_target(daily_temps_stars_cube,
              interpolate_daily_temps(daily_tmax_models,
                                      dem[area_of_interest], "tmax")),
-  tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube), format = "file")
+  tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube,
+                                  path = paste0("out/data/daily_temps_",
+                                                start_date, "-", end_date, ".nc")),
+                                  format = "file")
 )
 
 heatwave_targets <- list(
-  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube)),
-  tar_target(pixel_lha, pixel_lha_lookup(daily_temps_stars_cube, area_of_interest))
+  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube,
+                                                       start_date = start_date,
+                                                       end_date = end_date)),
+  tar_target(pixel_lha, pixel_lha_lookup(daily_temps_stars_cube, area_of_interest)),
+  tar_target(pixel_events_clims, events_clim_daily(pixel_clims)),
+  tar_target(lha_clim_summary, summarize_lha_clims(pixel_events_clims, pixel_lha)),
+  tar_target(lha_events, detect_lha_events(lha_clim_summary)),
+  tar_target(lha_events_by_date, lapply(lha_events, `[[`, "climatology") |>
+               dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE")),
+  tar_target(lha_events_summary, lapply(lha_events, `[[`, "event") |>
+               dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE"))
+)
+
+output_targets <- list(
+  tar_target(
+    lha_events_by_date_csv,
+    write_csv_output(lha_events_by_date,
+                     file.path(hw_output_dir, "lha_events_by_date.csv")),
+    format = "file"
+  ),
+  tar_target(
+    lha_events_summary_csv,
+    write_csv_output(lha_events_summary,
+                     file.path(hw_output_dir, "lha_events_summary.csv")),
+    format = "file"
+  )
 )
 
 # health sites
@@ -139,6 +166,7 @@ health_facilities <- list(
     static_vars,
     climate_targets,
     heatwave_targets,
+    output_targets,
     # processing_targets,
     # health_facilities,
     #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
