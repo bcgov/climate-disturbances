@@ -16,14 +16,30 @@ library(targets)
 library(tarchetypes)
 # Read the tar_script() help file for details.
 
-## Source all functions
-source("R/setup.R")
+tar_option_set(packages = desc::desc_get_deps()$package)
+## Folders
+dir.create("data", showWarnings = FALSE)
 
 ## Load packages
 tar_option_set(packages = .packages())
 
-future::plan(multisession(workers = 6))
+## To debug a target set the target:
+#      tar_option_set(debug = "lha_events_by_date")
+## and run:
+#      tar_make(callr_function = NULL)
+##  You can do:
+#      tar_make(names = "lha_events_by_date", shortcut = TRUE, callr_function = NULL)
+##  to only run the target of interest and skip checking upstream targets
 
+## Source functions
+r_files <- list.files("R", pattern = "*.R", full.names = TRUE)
+dump <- lapply(r_files, source, echo = FALSE, verbose = FALSE)
+
+future::plan(future::multisession(workers = 6))
+
+## Create output directories:
+hw_output_dir <- "out/heatwave_summaries"
+dir.create(hw_output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Load --------------------------------------------------------------------
 # time variables
