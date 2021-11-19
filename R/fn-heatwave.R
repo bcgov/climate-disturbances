@@ -1,4 +1,4 @@
-# Copyright 2020 Province of British Columbia
+# Copyright 2021 Province of British Columbia
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -9,153 +9,6 @@
 # Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
-
-
-
-# Air Quality -------------------------------------------------------------
-
-get_pm25_data <- function(...) {
-  pm25_link <- "ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv"
-
-  stored_path <- file.path("data/air_quality", basename(pm25_link))
-
-  if (!file.exists(stored_path)) {
-    dir.create(dirname(stored_path), showWarnings = FALSE )
-    download.file(pm25_link, destfile = stored_path, quiet = TRUE, method = "curl")
-  }
-
-  arrow::open_dataset(dirname(stored_path), format = "csv", schema = arrow::schema(
-    DATE_PST = arrow::timestamp(),
-    STATION_NAME = arrow::string(),
-    EMS_ID = arrow::string(),
-    PARAMETER = arrow::string(),
-    INSTRUMENT = arrow::string(),
-    RAW_VALUE = arrow::float64(),
-    UNIT = arrow::string(),
-    ROUNDED_VALUE = arrow::float64()
-  ), ...)
-}
-
-
-air_quality_stations_geo <- function() {
-  aq_stations_link <- "ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/Air_Monitoring_Stations/bc_air_monitoring_stations.csv"
-
-  aq_stations <- readr::read_csv(aq_stations_link, col_types = c("cccddcdddccccDD"), na = c("", "N/A"))
-  aq_stations <- dplyr::filter(aq_stations, !is.na(LONG), !is.na(LAT))
-  aq_stations <- sf::st_as_sf(aq_stations, coords = c("LONG", "LAT"), crs = "+proj=longlat")
-  bcmaps::transform_bc_albers(aq_stations)
-
-}
-
-pm25 <- function(aoi=NULL, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL) {
-  aoi <- bcmaps::transform_bc_albers(aoi)
-  stations_in_aoi <- sf::st_filter(air_quality_stations_geo(), aoi)
-  d <- get_pm25_data()
-
-  if (!is.null(aoi)) d <- filter(d, EMS_ID %in% unique(stations_in_aoi$EMS_ID))
-  if (!is.null(start_date)) d <- filter(d, DATE_PST >= start_date)
-  if (!is.null(end_date)) d <- filter(d, DATE_PST <= end_date)
-
-  d <- d %>%
-    collect()
-
-
-  if(add_aoi_attributes) {
-    geo_attr <- st_join(select(stations_in_aoi, EMS_ID), aoi)
-    geo_attr <- st_drop_geometry(geo_attr)
-
-    d <- d %>% left_join(geo_attr)
-  }
-
-  janitor::clean_names(d)
-}
-
-
-# Weather -----------------------------------------------------------------
-
-
-get_climate_data <- function(ids, data_dir = "data/weather", interval = "day", ask = TRUE) {
-  if(!dir.exists(data_dir)) dir.create(data_dir)
-
-  potential_paths <- file.path(data_dir, ids)
-  needed_stations <- ids[!dir.exists(potential_paths)]
-
-  msg <- message(paste0(length(needed_stations),
-                        " of ",
-                        length(potential_paths),
-                        " stations need to be downloaded."))
-
-  if (ask) ans <- ask(msg) else ans <- TRUE
-
-  if(ans) {
-    purrr::walk(needed_stations, ~{
-      d <- weathercan::weather_dl(.x, interval = interval)
-      if (!dir.exists(file.path(data_dir, .x))) dir.create(file.path(data_dir, .x))
-      arrow::write_parquet(d, sink = file.path(data_dir, .x, "data.parquet"))
-      rm(d)
-      gc()
-    })
-  } else {
-    message("Have a nice day!")
-  }
-
-  invisible(TRUE)
-}
-
-weather_stations_geo <- function(interval_var = 'day') {
-
-  stations <- dplyr::filter(stations(), prov == "BC", interval == interval_var)
-  stations <- sf::st_as_sf(stations, coords = c("lon", "lat"), crs = "+proj=longlat")
-  bcmaps::transform_bc_albers(stations)
-}
-
-normals_stations_geo <- function() {
-  dplyr::filter(stations, normals, prov == "BC", interval == "day")
-}
-
-weather <- function(aoi, add_aoi_attributes = TRUE, start_date = NULL, end_date = NULL, interval_var = 'day', normals, ask = TRUE) {
-
-  search_int <- lubridate::interval(start_date, end_date)
-
-  aoi <- bcmaps::transform_bc_albers(aoi)
-
-  if (normals) {
-    stations_in_aoi <- sf::st_filter(weather_stations_geo(interval_var = interval_var), aoi) %>%
-      filter(normals)
-  } else {
-    stations_in_aoi <- sf::st_filter(weather_stations_geo(interval_var = interval_var), aoi)
-  }
-
-  stations_in_aoi$station_int <- lubridate::interval(
-    as.Date(paste0(stations_in_aoi$start,"-01-01")),
-    as.Date(paste0(stations_in_aoi$end, "-12-31")))
-
-  stations_in_aoi <- filter(stations_in_aoi, int_overlaps(station_int, search_int))
-
-  if (!get_climate_data(stations_in_aoi$station_id, ask = ask)) stop("Problems with downloading", call. = FALSE)
-
-  d <- arrow::open_dataset(here::here("data/weather/"), partitioning = "station_idtemp")
-
-  if (!is.null(aoi)) d <- filter(d, station_idtemp %in% stations_in_aoi$station_id)
-
-  d <- d %>%
-    select(-station_idtemp) %>%
-    collect()
-
-  ## Date filtering not working with arrow right now. MVP.
-  if (!is.null(end_date)) d <- filter(d, date <= end_date)
-  if (!is.null(start_date)) d <- filter(d, date >= start_date)
-
-  if(add_aoi_attributes) {
-    geo_attr <- st_join(select(stations_in_aoi, station_id), aoi)
-    geo_attr <- st_drop_geometry(geo_attr)
-
-    d <- d %>% left_join(geo_attr)
-  }
-
-  janitor::clean_names(d)
-
-}
 
 ########### Create temperature surfaces
 
@@ -386,12 +239,11 @@ interpolate_daily_temps <- function(model_list, dem, variable) {
   stars_cube
 }
 
-write_ncdf <- function(cube, dir = "data/out") {
-  name <- paste0(deparse(substitute(cube)), ".nc")
-  out_rast <- as(cube, "Raster")
+write_ncdf <- function(cube, path) {
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
 
-  path <- file.path(dir, name)
-  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  out_rast <- stars:::st_as_raster(cube, "Raster")
+
   # Write as netcdf
   raster::writeRaster(out_rast, path, format = "CDF",
               xname = "x", yname = "y",
@@ -403,13 +255,26 @@ write_ncdf <- function(cube, dir = "data/out") {
 
 ##### Heatwave detection
 
-generate_pixel_climatologies <- function(stars_cube) {
+#' Generate climatologies for the period of record for all pixels
+#'
+#' @param stars_cube stars cube of tmax for timeseries of interest
+#' @param start_date date
+#' @param end_date date
+#'
+#' @return list of climatologies (outputs of heatwaveR::ts2clm);
+#' one element for each pixel
+generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
   not_na_pixels <- !is.na(stars_cube$tmax)
   num_pixels_per_slice <- apply(not_na_pixels, 3, sum)
   targets::tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
   num_pixels <- min(num_pixels_per_slice)
 
-  num_times <- length(stars::st_get_dimension_values(stars_cube, "time"))
+  times <- stars::st_get_dimension_values(stars_cube, "time")
+
+  targets::tar_assert_inherits(start_date, "Date")
+  targets::tar_assert_inherits(end_date, "Date")
+
+  num_times <- length(times)
 
   # Long data frame of tmax for every pixel for every date
   all_temps <- as.data.frame(stars_cube) |>
@@ -427,18 +292,102 @@ generate_pixel_climatologies <- function(stars_cube) {
 
   # Calculate climatologies for each pixel
   future.apply::future_lapply(all_temps_split, heatwaveR::ts2clm,
-                climatologyPeriod = c("1990-04-01", "2020-01-01"),
+                climatologyPeriod = c(start_date, end_date),
                 future.seed = 13L)
 }
 
+#' Create lookup table of pixels:LHAs
+#'
+#' @param stars_cube stars cube of tmax for timeseries of interest
+#' @param area_of_interest sf polygons
+#'
+#' @return tibble with x, y, pixel_id (concatenation of x & y),
+#' LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME
 pixel_lha_lookup <- function(stars_cube, area_of_interest) {
   rast <- dplyr::slice(stars_cube, "time", 1)
-  pixels <- as.data.frame(rast) |>
+  as.data.frame(rast) |>
     dplyr::select(-tmax) |>
     dplyr::mutate(pixel_id = paste(x, y, sep = ";")) |>
     sf::st_as_sf(coords = c("x", "y"), crs = st_crs(stars_cube)) |>
     sf::st_join(
       dplyr::select(area_of_interest,
                     LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME)
-      )
+      ) |>
+    dplyr::filter(!is.na(LOCAL_HLTH_AREA_CODE))
 }
+
+#' Extract the long day-by-day identification of heatwaves at each pixel
+#'
+#' @param clims_list output of generate_pixel_climatologies()
+#'
+#' @return tibble of events (one row for each day*pixel)
+events_clim_daily <- function(clims_list) {
+  # Detect events at each pixel based on climatology
+  events_list <- future_lapply(clims_list, \(x) {
+    heatwaveR::detect_event(x, minDuration = 2, S = FALSE)
+  }, future.seed = 13L)
+
+  # extract daily event stats and combine to table
+  future_lapply(names(events_list), \(x) {
+    event <- events_list[[x]]$climatology
+    event$pixel_id <- x
+    event[c("pixel_id", setdiff(names(event), "pixel_id"))] |>
+      tidyr::separate(pixel_id, into = c("x", "y"), ";",
+                      remove = FALSE, convert = TRUE)
+  }) |>
+    dplyr::bind_rows()
+}
+
+#' Summarize climatologies of pixels by LHA
+#'
+#' @param event_clims output of events_clims_daily()
+#' @param lha_pixel_lookup output of pixel_lha_lookup()
+#'
+#' @return data.frame of LHA climatology summary statistics
+summarize_lha_clims <- function(event_clims, lha_pixel_lookup) {
+
+  # summarize climatology stats by LHA by date.
+  lha_event_clims <- event_clims |>
+    dplyr::left_join(sf::st_drop_geometry(lha_pixel_lookup), by = "pixel_id") |>
+    dplyr::group_by(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME, t, doy) |>
+    dplyr::summarise(
+      dplyr::across(.cols = c(temp, seas, thresh),
+                    .fns = list(mean = mean, median = median, max = max, sd = sd),
+                    na.rm = TRUE),
+      dplyr::across(temp,
+                    .fns = setNames(lapply(c(0.1, 0.25, 0.75, 0.9), \(p) {
+                      function(x) quantile(x, p, na.rm = TRUE, names = FALSE)
+                    }),
+                    c(0.1, 0.25, 0.75, 0.9))),
+      n = dplyr::n(),
+      dplyr::across(.cols = c(event, threshCriterion, durationCriterion),
+                    .fns = ~ sum(as.numeric(.x), na.rm = TRUE) / n,
+                    .names = "{.col}_percent"),
+      .groups = "drop")
+}
+
+#' Detect events aggregated by LHA.
+#'
+#' Compares LHA mean temperature to LHA mean threshold for each day,
+#' and an additional threshold of 75th percentile tmax >=30C
+#'
+#' @param event_clims output of summarize_lha_clims()
+#'
+#' @return list of event objects (from heatwaveR::detect_event());
+#' one for each LHA
+detect_lha_events <- function(lha_clim_summary) {
+  # Use LHA summary to identify events, min 2 days
+  # Using 75 percentile of pixels in LHA
+  lha_clim_summary |>
+    dplyr::mutate(thresh2 = temp_0.75 >= 30) |>
+    dplyr::select(LOCAL_HLTH_AREA_CODE,
+                  t, temp = temp_mean, seas = seas_mean,
+                  thresh = thresh_mean,
+                  thresh2) |>
+    (\(x) split(x, x$LOCAL_HLTH_AREA_CODE))() |>
+    lapply(\(x) {
+      heatwaveR::detect_event(x, threshClim2 = x$thresh2, minDuration = 2,
+                              categories = TRUE, climatology = TRUE, S = FALSE)
+    })
+}
+
