@@ -103,10 +103,10 @@ read_ahccd_data_single <- function(datafile) {
     temp = ifelse(temp < -9000, NA_real_, temp)
   )
 
-  data %>%
+  data |>
     dplyr::select(stn_id, stn_name, measure, date, year = Year,
                   month = Mo, temp, dplyr::everything(),
-                  -DoM) %>%
+                  -DoM) |>
     dplyr::filter(!is.na(date)) # Remove invalid dates
 }
 
@@ -164,10 +164,10 @@ get_ahccd_stations <- function() {
 
   stations <- readxl::read_excel(stations_file, skip = 4, col_names = colnames)
 
-  stations <- stations %>%
-    janitor::clean_names() %>%
+  stations <- stations |>
+    janitor::clean_names() |>
     dplyr::mutate(from = paste(from, x6, sep = "-"),
-                  to = paste(to, x8, sep = "-")) %>%
+                  to = paste(to, x8, sep = "-")) |>
     dplyr::select(-x6, -x8)
 
   sf::st_as_sf(stations, coords = c("long_deg", "lat_deg"), crs = 4326)
@@ -182,8 +182,8 @@ get_bc_target_stations <- function(stations, buffer, crs) {
 
 get_dem <- function(aoi = NULL, res) {
   if (is.null(aoi)) {
-    aoi <- bcmaps::bc_bound() %>%
-      sf::st_buffer(50000) %>%
+    aoi <- bcmaps::bc_bound() |>
+      sf::st_buffer(50000) |>
       sf::st_transform(4326)
   }
 
@@ -200,18 +200,18 @@ get_dem <- function(aoi = NULL, res) {
 }
 
 model_temps_xyz <- function(temp_data, stations, months) {
-  temp_data <- temp_data %>%
+  temp_data <- temp_data |>
     dplyr::filter(month %in% months)
 
   stations <- cbind(sf::st_drop_geometry(stations),
-                    sf::st_coordinates(stations)) %>%
+                    sf::st_coordinates(stations)) |>
     dplyr::select(stn_id, x = X, y = Y, elevation = elev_m)
 
   days <- unique(temp_data$date)
 
   out <- future.apply::future_lapply(days, function(d) {
     data <- temp_data[temp_data$date == d, , drop = FALSE]
-    df <- dplyr::left_join(stations, data, by = "stn_id") %>%
+    df <- dplyr::left_join(stations, data, by = "stn_id") |>
       dplyr::select(x, y, elevation, temp)
     temp_tps(df)
   }, future.seed = 13L)
