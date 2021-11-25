@@ -45,6 +45,7 @@ static_vars <- list(
   tar_target(start_date, as.Date('1990-04-01')),
   tar_target(end_date, as.Date("2020-09-30")),
   tar_target(raster_res, 0.05), # 0.05 degrees ~ 5km
+  # For a list of possible LHAs, see: bcmaps::health_lha()$LOCAL_HLTH_AREA_NAME
   tar_target(LHAs, c("Greater Nanaimo",
                      "Kamloops",
                      "Central Okanagan",
