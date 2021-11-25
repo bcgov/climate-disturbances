@@ -101,7 +101,7 @@ climate_targets <- list(
                collect()),
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
-                                           months = 4:9)),
+                                           months = 4:9, future.seed = 13L)),
   tar_target(daily_temps_stars_cube,
              interpolate_daily_temps(daily_tmax_models,
                                      dem[area_of_interest], "tmax")),
@@ -116,7 +116,7 @@ heatwave_targets <- list(
                                                        start_date = start_date,
                                                        end_date = end_date)),
   tar_target(pixel_lha, pixel_lha_lookup(daily_temps_stars_cube, area_of_interest)),
-  tar_target(pixel_events_clims, events_clim_daily(pixel_clims)),
+  tar_target(pixel_events_clims, events_clim_daily(pixel_clims, future.seed = 13L)),
   tar_target(lha_clim_summary, summarize_lha_clims(pixel_events_clims, pixel_lha)),
   tar_target(lha_events, detect_lha_events(lha_clim_summary)),
   tar_target(lha_events_by_date, lapply(lha_events, `[[`, "climatology") |>

@@ -207,7 +207,7 @@ get_dem <- function(aoi = NULL, res) {
   stars::read_stars(fname, proxy = FALSE)
 }
 
-model_temps_xyz <- function(temp_data, stations, months) {
+model_temps_xyz <- function(temp_data, stations, months, ...) {
   temp_data <- temp_data |>
     dplyr::filter(month %in% months)
 
@@ -222,7 +222,7 @@ model_temps_xyz <- function(temp_data, stations, months) {
     df <- dplyr::left_join(stations, data, by = "stn_id") |>
       dplyr::select(x, y, elevation, temp)
     temp_tps(df)
-  }, future.seed = 13L)
+  }, ...)
 
   stats::setNames(out, as.character(days))
 }
@@ -327,13 +327,14 @@ pixel_lha_lookup <- function(stars_cube, area_of_interest) {
 #' Extract the long day-by-day identification of heatwaves at each pixel
 #'
 #' @param clims_list output of generate_pixel_climatologies()
+#' @param ... parameters passed on to `future_lapply`
 #'
 #' @return tibble of events (one row for each day*pixel)
-events_clim_daily <- function(clims_list) {
+events_clim_daily <- function(clims_list, ...) {
   # Detect events at each pixel based on climatology
-  events_list <- future_lapply(clims_list, \(x) {
+  events_list <- future.apply::future_lapply(clims_list, \(x) {
     heatwaveR::detect_event(x, minDuration = 2, S = FALSE)
-  }, future.seed = 13L)
+  }, ...)
 
   # extract daily event stats and combine to table
   future_lapply(names(events_list), \(x) {
