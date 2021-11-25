@@ -20,8 +20,6 @@ tar_option_set(packages = desc::desc_get_deps()$package)
 ## Folders
 dir.create("data", showWarnings = FALSE)
 
-## Load packages
-tar_option_set(packages = .packages())
 
 ## To debug a target set the target:
 #      tar_option_set(debug = "lha_events_by_date")
