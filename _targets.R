@@ -89,7 +89,10 @@ climate_targets <- list(
     format = "file"
   ),
   tar_target(climate_stations, get_ahccd_stations()),
-  tar_target(target_stations, get_bc_target_stations(climate_stations, buffer = 200, crs = sf::st_crs(dem))),
+  tar_target(target_stations,
+             get_bc_target_stations(climate_stations,
+                                    buffer = 200, # Buffer in Km
+                                    crs = sf::st_crs(dem))),
   tar_target(dem, get_dem(res = raster_res)),
   tar_target(analysis_temps, arrow::open_dataset(ahccd_parquet_path) %>%
                filter(date >= start_date, date <= end_date,

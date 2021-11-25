@@ -173,6 +173,14 @@ get_ahccd_stations <- function() {
   sf::st_as_sf(stations, coords = c("long_deg", "lat_deg"), crs = 4326)
 }
 
+#' Get stations in and around BC based on a buffer around BC
+#'
+#' @param stations data.frame of stations
+#' @param buffer buffer distance in KMs
+#' @param crs output crs
+#'
+#' @return sf object containing stations of interest
+#' @export
 get_bc_target_stations <- function(stations, buffer, crs) {
   bc_buff <- sf::st_buffer(st_union(bcmaps::bc_bound()), dist = buffer * 1000)
   stations <- sf::st_transform(stations, sf::st_crs(bc_buff))
