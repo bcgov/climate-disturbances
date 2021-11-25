@@ -120,7 +120,8 @@ heatwave_targets <- list(
   tar_target(lha_clim_summary, summarize_lha_clims(pixel_events_clims, pixel_lha)),
   tar_target(lha_events, detect_lha_events(lha_clim_summary)),
   tar_target(lha_events_by_date, lapply(lha_events, `[[`, "climatology") |>
-               dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE")),
+               dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE") |>
+               dplyr::rename(date = t)),
   tar_target(lha_events_summary, lapply(lha_events, `[[`, "event") |>
                dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE"))
 )
