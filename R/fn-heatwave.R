@@ -327,14 +327,15 @@ pixel_lha_lookup <- function(stars_cube, area_of_interest) {
 
 #' Extract the long day-by-day identification of heatwaves at each pixel
 #'
-#' @param clims_list output of generate_pixel_climatologies()
+#' @param clims_list output of `generate_pixel_climatologies()`
+#' @param minDuration passed on `heatwaveR::detect_event()`
 #' @param ... parameters passed on to `future_lapply`
 #'
 #' @return tibble of events (one row for each day*pixel)
-events_clim_daily <- function(clims_list, ...) {
+events_clim_daily <- function(clims_list, minDuration = 2, ...) {
   # Detect events at each pixel based on climatology
   events_list <- future.apply::future_lapply(clims_list, \(x) {
-    heatwaveR::detect_event(x, minDuration = 2, S = FALSE)
+    heatwaveR::detect_event(x, minDuration = minDuration, S = FALSE)
   }, ...)
 
   # extract daily event stats and combine to table
