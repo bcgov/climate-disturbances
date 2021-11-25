@@ -33,6 +33,7 @@ Imports:
     tidyhydat,
     heatwaveR,
     readxl,
+    ncdf4,
     stars,
     fields,
     raster,
