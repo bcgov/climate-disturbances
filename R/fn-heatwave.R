@@ -273,6 +273,7 @@ write_ncdf <- function(cube, path) {
 #' one element for each pixel
 generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
   not_na_pixels <- !is.na(stars_cube$tmax)
+  # Check each time period has the same number of pixels (3 is the time dimension)
   num_pixels_per_slice <- apply(not_na_pixels, 3, sum)
   targets::tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
   num_pixels <- min(num_pixels_per_slice)
