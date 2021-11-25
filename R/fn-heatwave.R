@@ -383,10 +383,11 @@ summarize_lha_clims <- function(event_clims, lha_pixel_lookup) {
 #' and an additional threshold of 75th percentile tmax >=30C
 #'
 #' @param event_clims output of summarize_lha_clims()
+#' @param minDuration passed on `heatwaveR::detect_event()`
 #'
 #' @return list of event objects (from heatwaveR::detect_event());
 #' one for each LHA
-detect_lha_events <- function(lha_clim_summary) {
+detect_lha_events <- function(lha_clim_summary, minDuration = 2) {
   # Use LHA summary to identify events, min 2 days
   # Using 75 percentile of pixels in LHA
   lha_clim_summary |>
@@ -397,7 +398,7 @@ detect_lha_events <- function(lha_clim_summary) {
                   thresh2) |>
     (\(x) split(x, x$LOCAL_HLTH_AREA_CODE))() |>
     lapply(\(x) {
-      heatwaveR::detect_event(x, threshClim2 = x$thresh2, minDuration = 2,
+      heatwaveR::detect_event(x, threshClim2 = x$thresh2, minDuration = minDuration,
                               categories = TRUE, climatology = TRUE, S = FALSE)
     })
 }
