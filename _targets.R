@@ -34,7 +34,7 @@ tar_option_set(packages = .packages())
 ## Source functions
 r_files <- list.files("R", pattern = "*.R", full.names = TRUE)
 dump <- lapply(r_files, source, echo = FALSE, verbose = FALSE)
-
+if (.Platform$OS.type == "windows") options("arrow.use_threads" = FALSE)
 future::plan(future::multisession(workers = 6))
 
 ## Create output directories:
