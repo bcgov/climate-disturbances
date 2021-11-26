@@ -306,24 +306,23 @@ generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
                 future.seed = 13L)
 }
 
-#' Create lookup table of pixels:LHAs
+#' Create lookup table of pixels:AOIs
 #'
 #' @param stars_cube stars cube of tmax for timeseries of interest
 #' @param area_of_interest sf polygons
 #'
 #' @return tibble with x, y, pixel_id (concatenation of x & y),
 #' LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME
-pixel_lha_lookup <- function(stars_cube, area_of_interest) {
+pixel_aoi_lookup <- function(stars_cube, area_of_interest, group_vars) {
   rast <- dplyr::slice(stars_cube, "time", 1)
   as.data.frame(rast) |>
     dplyr::select(-tmax) |>
     dplyr::mutate(pixel_id = paste(x, y, sep = ";")) |>
-    sf::st_as_sf(coords = c("x", "y"), crs = st_crs(stars_cube)) |>
+    sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(stars_cube)) |>
     sf::st_join(
-      dplyr::select(area_of_interest,
-                    LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME)
+      dplyr::select(area_of_interest, {{group_vars}})
       ) |>
-    dplyr::filter(!is.na(LOCAL_HLTH_AREA_CODE))
+    dplyr::filter(dplyr::across({{group_vars}}, ~ !is.na(.)))
 }
 
 #' Extract the long day-by-day identification of heatwaves at each pixel
@@ -350,18 +349,18 @@ events_clim_daily <- function(clims_list, minDuration = 2, ...) {
     dplyr::bind_rows()
 }
 
-#' Summarize climatologies of pixels by LHA
+#' Summarize climatologies of pixels by AOI
 #'
 #' @param event_clims output of events_clims_daily()
-#' @param lha_pixel_lookup output of pixel_lha_lookup()
+#' @param aoi_pixel_lookup output of pixel_aoi_lookup()
 #'
-#' @return data.frame of LHA climatology summary statistics
-summarize_lha_clims <- function(event_clims, lha_pixel_lookup) {
+#' @return data.frame of aoi climatology summary statistics
+summarize_aoi_clims <- function(event_clims, aoi_pixel_lookup, group_vars) {
 
-  # summarize climatology stats by LHA by date.
-  lha_event_clims <- event_clims |>
-    dplyr::left_join(sf::st_drop_geometry(lha_pixel_lookup), by = "pixel_id") |>
-    dplyr::group_by(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME, t, doy) |>
+  # summarize climatology stats by AOI by date.
+  event_clims |>
+    dplyr::left_join(sf::st_drop_geometry(aoi_pixel_lookup), by = "pixel_id") |>
+    dplyr::group_by(across({{group_vars}})) |>
     dplyr::summarise(
       dplyr::across(.cols = c(temp, seas, thresh),
                     .fns = list(mean = mean, median = median, max = max, sd = sd),
@@ -378,26 +377,26 @@ summarize_lha_clims <- function(event_clims, lha_pixel_lookup) {
       .groups = "drop")
 }
 
-#' Detect events aggregated by LHA.
+#' Detect events aggregated by AOI.
 #'
-#' Compares LHA mean temperature to LHA mean threshold for each day,
+#' Compares AOI mean temperature to AOI mean threshold for each day,
 #' and an additional threshold of 75th percentile tmax >=30C
 #'
-#' @param event_clims output of summarize_lha_clims()
+#' @param event_clims output of summarize_aoi_clims()
 #' @param minDuration passed on `heatwaveR::detect_event()`
 #'
 #' @return list of event objects (from heatwaveR::detect_event());
-#' one for each LHA
-detect_lha_events <- function(lha_clim_summary, minDuration = 2) {
-  # Use LHA summary to identify events, min 2 days
-  # Using 75 percentile of pixels in LHA
-  lha_clim_summary |>
+#' one for each aoi
+detect_aoi_events <- function(aoi_clim_summary, aoi_field, minDuration = 2) {
+  # Use aoi summary to identify events, min 2 days
+  # Using 75 percentile of pixels in aoi
+  aoi_clim_summary |>
     dplyr::mutate(thresh2 = temp_0.75 >= 30) |>
-    dplyr::select(LOCAL_HLTH_AREA_CODE,
+    dplyr::select(dplyr::all_of(aoi_field),
                   t, temp = temp_mean, seas = seas_mean,
                   thresh = thresh_mean,
                   thresh2) |>
-    (\(x) split(x, x$LOCAL_HLTH_AREA_CODE))() |>
+    (\(x) split(x, x[[aoi_field]]))() |>
     lapply(\(x) {
       heatwaveR::detect_event(x, threshClim2 = x$thresh2, minDuration = minDuration,
                               categories = TRUE, climatology = TRUE, S = FALSE)

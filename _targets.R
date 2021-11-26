@@ -22,11 +22,11 @@ dir.create("data", showWarnings = FALSE)
 
 
 ## To debug a target set the target:
-#      tar_option_set(debug = "lha_events_by_date")
+#      tar_option_set(debug = "aoi_events_by_date")
 ## and run:
 #      tar_make(callr_function = NULL)
 ##  You can do:
-#      tar_make(names = "lha_events_by_date", shortcut = TRUE, callr_function = NULL)
+#      tar_make(names = "aoi_events_by_date", shortcut = TRUE, callr_function = NULL)
 ##  to only run the target of interest and skip checking upstream targets
 
 ## Source functions
@@ -115,27 +115,29 @@ heatwave_targets <- list(
   tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube,
                                                        start_date = start_date,
                                                        end_date = end_date)),
-  tar_target(pixel_lha, pixel_lha_lookup(daily_temps_stars_cube, area_of_interest)),
+  tar_target(pixel_aoi_lup, pixel_aoi_lookup(daily_temps_stars_cube, area_of_interest,
+                                             group_vars = c(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME))),
   tar_target(pixel_events_clims, events_clim_daily(pixel_clims, future.seed = 13L)),
-  tar_target(lha_clim_summary, summarize_lha_clims(pixel_events_clims, pixel_lha)),
-  tar_target(lha_events, detect_lha_events(lha_clim_summary)),
-  tar_target(lha_events_by_date, lapply(lha_events, `[[`, "climatology") |>
+  tar_target(aoi_clim_summary, summarize_aoi_clims(pixel_events_clims, pixel_aoi_lup,
+                                                   group_vars = c(LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME, t, doy))),
+  tar_target(aoi_events, detect_aoi_events(aoi_clim_summary, aoi_field = "LOCAL_HLTH_AREA_CODE")),
+  tar_target(aoi_events_by_date, lapply(aoi_events, `[[`, "climatology") |>
                dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE") |>
                dplyr::rename(date = t)),
-  tar_target(lha_events_summary, lapply(lha_events, `[[`, "event") |>
+  tar_target(aoi_events_summary, lapply(aoi_events, `[[`, "event") |>
                dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE"))
 )
 
 output_targets <- list(
   tar_target(
     lha_events_by_date_csv,
-    write_csv_output(lha_events_by_date,
+    write_csv_output(aoi_events_by_date,
                      file.path(hw_output_dir, "lha_events_by_date.csv")),
     format = "file"
   ),
   tar_target(
     lha_events_summary_csv,
-    write_csv_output(lha_events_summary,
+    write_csv_output(aoi_events_summary,
                      file.path(hw_output_dir, "lha_events_summary.csv")),
     format = "file"
   )
