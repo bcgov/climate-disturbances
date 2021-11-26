@@ -101,7 +101,7 @@ climate_targets <- list(
                dplyr::collect()),
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = dplyr::filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
-                                           months = 4:9, future.seed = 13L)),
+                                           months = 1:12, future.seed = 13L)),
   tar_target(daily_temps_stars_cube,
              interpolate_daily_temps(daily_tmax_models,
                                      dem[area_of_interest], "tmax")),
