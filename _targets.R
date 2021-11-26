@@ -71,9 +71,9 @@ static_vars <- list(
 #  climate data
 climate_targets <- list(
   tar_target(area_of_interest,
-             health_lha() %>%
-               filter(LOCAL_HLTH_AREA_NAME %in% LHAs) %>%
-               st_transform(st_crs(dem))),
+             bcmaps::health_lha() %>%
+               dplyr::filter(LOCAL_HLTH_AREA_NAME %in% LHAs) %>%
+               sf::st_transform(sf::st_crs(dem))),
   # #tar_target(pm25_data, pm25(area_of_interest, start_date = start_date, end_date = end_date)), ##pm data has some issues with arrow col specs
   # tar_target(weather_data, weather(area_of_interest, start_date = start_date, end_date = end_date, normals = FALSE, ask = FALSE)),
   # tar_target(area_burned_over_time, calc_area_burned_over_time(area_of_interest)),
@@ -95,11 +95,11 @@ climate_targets <- list(
                                     crs = sf::st_crs(dem))),
   tar_target(dem, get_dem(res = raster_res)),
   tar_target(analysis_temps, arrow::open_dataset(ahccd_parquet_path) %>%
-               filter(date >= start_date, date <= end_date,
+               dplyr::filter(date >= start_date, date <= end_date,
                       stn_id %in% target_stations$stn_id,
                       measure %in% c("daily_max", "daily_min")) %>%
-               collect()),
-  tar_target(daily_tmax_models, model_temps_xyz(temp_data = filter(analysis_temps, measure == "daily_max"),
+               dplyr::collect()),
+  tar_target(daily_tmax_models, model_temps_xyz(temp_data = dplyr::filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
                                            months = 4:9, future.seed = 13L)),
   tar_target(daily_temps_stars_cube,
