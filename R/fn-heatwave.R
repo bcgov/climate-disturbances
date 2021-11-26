@@ -200,7 +200,8 @@ get_dem <- function(aoi = NULL, res) {
   dem_stars_out <- stars::st_warp(
     dem_stars,
     stars::st_as_stars(sf::st_bbox(aoi), dx = res),
-    method = "bilinear", use_gdal = TRUE
+    method = "bilinear", use_gdal = TRUE,
+    no_data_value = NA_real_
   )
   fname <- paste0("data/dem_stars_", as.character(res), ".tif")
   stars::write_stars(dem_stars_out, fname)
