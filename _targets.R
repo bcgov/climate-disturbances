@@ -22,11 +22,11 @@ dir.create("data", showWarnings = FALSE)
 
 
 ## To debug a target set the target:
-#      tar_option_set(debug = "aoi_events_by_date")
+      # tar_option_set(debug = "area_of_interest")
 ## and run:
-#      tar_make(callr_function = NULL)
+     # tar_make(callr_function = NULL)
 ##  You can do:
-#      tar_make(names = "aoi_events_by_date", shortcut = TRUE, callr_function = NULL)
+     # tar_make(names = "area_of_interest", shortcut = TRUE, callr_function = NULL)
 ##  to only run the target of interest and skip checking upstream targets
 
 ## Source functions
