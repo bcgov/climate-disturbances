@@ -14,7 +14,7 @@
 
 library(targets)
 library(tarchetypes)
-# Read the tar_script() help file for details.
+# Read the documentation for tar_script() for help: Run ?tar_script to see the help file
 
 tar_option_set(packages = desc::desc_get_deps()$package)
 ## Folders
