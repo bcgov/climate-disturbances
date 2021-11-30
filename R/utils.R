@@ -17,3 +17,8 @@ ask <- function(...) {
   cat(paste0(..., collapse = ""))
   utils::menu(choices) == which(choices == "Yes")
 }
+
+write_csv_output <- function(x, path, ...) {
+  readr::write_csv(x, file = path, na = "")
+  path
+}
