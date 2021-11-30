@@ -84,7 +84,7 @@ climate_targets <- list(
     format = "file"
   ),
   tar_target(
-    ahccd_parquet_path,
+    ahccd_duckdb_path,
     write_ahccd_data(ahccd_zipfiles),
     format = "file"
   ),
@@ -94,11 +94,14 @@ climate_targets <- list(
                                     buffer = 200, # Buffer in Km
                                     crs = sf::st_crs(dem))),
   tar_target(dem, get_dem(res = raster_res)),
-  tar_target(analysis_temps, arrow::open_dataset(ahccd_parquet_path) %>%
-               dplyr::filter(date >= start_date, date <= end_date,
-                      stn_id %in% target_stations$stn_id,
-                      measure %in% c("daily_max", "daily_min")) %>%
-               dplyr::collect()),
+  tar_target(analysis_temps, {
+    on.exit(duckdb::duckdb_shutdown(duckdb::duckdb()))
+    ahccd_tbl(ahccd_duckdb_path) %>%
+      dplyr::filter(date >= start_date, date <= end_date,
+                    stn_id %in% local(target_stations$stn_id),
+                    measure %in% c("daily_max", "daily_min")) %>%
+      dplyr::collect()
+    }),
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = dplyr::filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
                                            months = 1:12, future.seed = 13L)),

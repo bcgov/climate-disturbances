@@ -111,7 +111,7 @@ read_ahccd_data_single <- function(datafile) {
 }
 
 write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
-                             data_dir = "data") {
+                             data_dir = "data", tbl_name = "ahccd_data") {
 
   stopifnot(length(zipfiles) == 3L)
   stopifnot(all(file.exists(zipfiles)))
@@ -123,32 +123,42 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
 
   data_dir <- normalizePath(data_dir, mustWork = TRUE)
 
-  parquet_path <- file.path(data_dir, "AHCCD_data", "parquet")
+  duckdb_path <- file.path(data_dir, "AHCCD_data", "duckdb", "ahccd.duckdb")
 
-  if (dir.exists(parquet_path)) {
-    del <- unlink(parquet_path, recursive = TRUE, force = TRUE)
-    if (!del) stop("unable to delete existing directory: ", parquet_path)
+  if (file.exists(duckdb_path)) {
+    del <- unlink(duckdb_path, recursive = TRUE, force = TRUE)
+    if (!del) stop("unable to delete existing database: ", duckdb_path)
   }
 
-  dir.create(parquet_path, recursive = TRUE, showWarnings = FALSE)
+  dir.create(dirname(duckdb_path), recursive = TRUE, showWarnings = FALSE)
 
-  message("Writing parquet files in ", parquet_path, "for ", length(fpaths[[1]]),
-          " stations, partitioning by stn_id, year, and measure")
+  con <- duckdb_connect(duckdb_path, read_only = FALSE)
 
+  message("Writing duckdb database in ", duckdb_path,
+          " for ", length(fpaths[[1]]), " stations")
 
-  # this could be done in parallel
-  furrr::future_pwalk(fpaths, function(x, y, z) {
+  DBI::dbCreateTable(con, tbl_name,
+                     fields = c(stn_id = "STRING", stn_name = "STRING", measure = "STRING",
+                                date = "DATE", year = "INTEGER", month = "INTEGER", temp = "DOUBLE",
+                                province = "STRING", stn_joined = "STRING", element = "STRING",
+                                unit = "STRING", stn_last_updated = "STRING", flag = "STRING"
+                     ))
+
+  purrr::pwalk(fpaths, function(x, y, z) {
     d1 <- read_ahccd_data_single(x)
     d2 <- read_ahccd_data_single(y)
     d3 <- read_ahccd_data_single(z)
 
     d <- dplyr::bind_rows(d1, d2, d3)
-    d <- dplyr::group_by(d, stn_id, year, measure)
-    arrow::write_dataset(d, parquet_path, format = "parquet")
+    DBI::dbAppendTable(conn = con, name = tbl_name, value = d)
   })
 
-  attr(parquet_path, "timestamp") <- as.character(Sys.time())
-  parquet_path
+  purrr::walk(c("stn_id", "measure", "date", "year", "month"), \(x) {
+    add_sql_index(con, colname = x)
+  })
+
+  attr(duckdb_path, "timestamp") <- as.character(Sys.time())
+  duckdb_path
 }
 
 get_ahccd_stations <- function() {
@@ -403,3 +413,19 @@ detect_aoi_events <- function(aoi_clim_summary, aoi_field, minDuration = 2) {
     })
 }
 
+duckdb_connect <- function(db_path, read_only = TRUE) {
+  DBI::dbConnect(duckdb::duckdb(), db_path, read_only = read_only)
+}
+
+add_sql_index <- function(con, tbl = "ahccd_data", colname,
+                          idxname = paste0(tolower(colname), "_idx")) {
+  sql_str <- sprintf("CREATE INDEX %s ON %s(%s)", idxname, tbl, colname)
+  DBI::dbExecute(con, sql_str)
+  invisible(NULL)
+}
+
+ahccd_tbl <- function(db_path, tbl = "ahccd_data") {
+  con <- duckdb_connect(db_path, read_only = TRUE)
+  # on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+  dplyr::tbl(con, tbl)
+}
