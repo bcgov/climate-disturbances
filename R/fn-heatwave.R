@@ -347,7 +347,7 @@ generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
 #' @return tibble with x, y, pixel_id (concatenation of x & y),
 #' and variables supplied in `group_vars`
 pixel_aoi_lookup <- function(stars_cube, area_of_interest, group_vars) {
-  rast <- dplyr::slice(stars_cube, "time", 1)
+  rast <- dplyr::slice(stars_cube[area_of_interest], "time", 1)
   as.data.frame(rast) |>
     dplyr::select(-tmax) |>
     dplyr::mutate(pixel_id = paste(x, y, sep = ";")) |>

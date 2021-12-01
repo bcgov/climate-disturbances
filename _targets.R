@@ -110,14 +110,14 @@ climate_targets <- list(
                                            stations = target_stations,
                                            months = 1:12, future.seed = 13L)),
   tar_target(model_output_tifs, interpolate_daily_temps(daily_tmax_models,
-                                                        dem[area_of_interest], "tmax",
+                                                        dem, "tmax",
                                                         path = paste0("out/data/daily_temps/")),
              format = "file"),
   tar_target(daily_temps_stars_cube, make_stars_cube(model_output_tifs, "tmax"))
 )
 
 heatwave_targets <- list(
-  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube,
+  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube[area_of_interest],
                                                        start_date = start_date,
                                                        end_date = end_date)),
   tar_target(pixel_aoi_lup, pixel_aoi_lookup(daily_temps_stars_cube, area_of_interest,
