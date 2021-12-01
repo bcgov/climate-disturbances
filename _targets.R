@@ -105,13 +105,11 @@ climate_targets <- list(
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = dplyr::filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
                                            months = 1:12, future.seed = 13L)),
-  tar_target(daily_temps_stars_cube,
-             interpolate_daily_temps(daily_tmax_models,
-                                     dem[area_of_interest], "tmax")),
-  tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube,
-                                  path = paste0("out/data/daily_temps_",
-                                                start_date, "-", end_date, ".nc")),
-                                  format = "file")
+  tar_target(model_output_tifs, interpolate_daily_temps(daily_tmax_models,
+                                                        dem[area_of_interest], "tmax",
+                                                        path = paste0("out/data/daily_temps/")),
+             format = "file"),
+  tar_target(daily_temps_stars_cube, make_stars_cube(model_output_tifs, "tmax"))
 )
 
 heatwave_targets <- list(

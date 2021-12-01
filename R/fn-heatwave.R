@@ -245,32 +245,52 @@ temp_tps <- function(df) {
   fields::Tps(x = indep, Y = df$temp, miles = FALSE)
 }
 
-interpolate_daily_temps <- function(model_list, dem, variable) {
-  stars_list <- future.apply::future_lapply(model_list, function(mod) {
-    predict(dem, mod)
+interpolate_daily_temps <- function(model_list, dem, variable, path) {
+
+  dir <- file.path(path, variable)
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+
+  out_files <- future.apply::future_lapply(names(model_list), function(x) {
+    mod <- model_list[[x]]
+    pred <- predict(dem, mod)
+    fname <- file.path(dir, paste0(x, ".tif"))
+    stars::write_stars(pred, fname)
+    fname
   }, future.packages = c("fields", "stars"))
 
-  dates <- as.Date(names(model_list))
-
-  stars_cube <- do.call("c", stars_list)
-  stars_cube <- stars::st_redimension(stars_cube, along = list(time = dates))
-  names(stars_cube) <- variable
-  stars_cube
+  unlist(out_files)
 }
 
-write_ncdf <- function(cube, path) {
-  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+make_stars_cube <- function(files, variable) {
 
-  out_rast <- stars:::st_as_raster(cube, "Raster")
+  stars_proxy_obj <- stars::read_stars(files,
+                          proxy = TRUE,
+                          # along = list(time = as.Date(names(model_list)))
+                          along = "time"
+  )
 
-  # Write as netcdf
-  raster::writeRaster(out_rast, path, format = "CDF",
-              xname = "x", yname = "y",
-              varname = "temp", varunit = "degC",
-              zname = "time", zunit = "days",
-              overwrite = TRUE)
-  path
+  names(stars_proxy_obj) <- variable
+
+  stars_fnames <- names(stars_proxy_obj[[variable]])
+  dates <- as.Date(gsub(".*(\\d{4}-\\d{2}-\\d{2})\\.tif", "\\1", stars_fnames))
+
+  stars_proxy_obj <- stars::st_set_dimensions(stars_proxy_obj, "time", dates)
+  stars_proxy_obj
 }
+
+# write_ncdf <- function(cube, path) {
+#   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+#
+#   out_rast <- stars:::st_as_raster(cube, "Raster")
+#
+#   # Write as netcdf
+#   raster::writeRaster(out_rast, path, format = "CDF",
+#               xname = "x", yname = "y",
+#               varname = "temp", varunit = "degC",
+#               zname = "time", zunit = "days",
+#               overwrite = TRUE)
+#   path
+# }
 
 ##### Heatwave detection
 
@@ -283,9 +303,10 @@ write_ncdf <- function(cube, path) {
 #' @return list of climatologies (outputs of heatwaveR::ts2clm);
 #' one element for each pixel
 generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
-  not_na_pixels <- !is.na(stars_cube$tmax)
   # Check each time period has the same number of pixels (3 is the time dimension)
-  num_pixels_per_slice <- apply(not_na_pixels, 3, sum)
+  not_na <- stars::st_apply(stars_cube, "time", \(x) sum(!is.na(x)))
+
+  num_pixels_per_slice <- stars::st_as_stars(not_na)$tmax
   targets::tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
   num_pixels <- min(num_pixels_per_slice)
 
@@ -322,7 +343,7 @@ generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
 #' @param area_of_interest sf polygons
 #'
 #' @return tibble with x, y, pixel_id (concatenation of x & y),
-#' LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME
+#' and variables supplied in `group_vars`
 pixel_aoi_lookup <- function(stars_cube, area_of_interest, group_vars) {
   rast <- dplyr::slice(stars_cube, "time", 1)
   as.data.frame(rast) |>
