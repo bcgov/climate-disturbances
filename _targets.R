@@ -32,8 +32,12 @@ dir.create("data", showWarnings = FALSE)
 ## Source functions
 r_files <- list.files("R", pattern = "*.R", full.names = TRUE)
 dump <- lapply(r_files, source, echo = FALSE, verbose = FALSE)
+
 if (.Platform$OS.type == "windows") options("arrow.use_threads" = FALSE)
-future::plan(future::multisession(workers = 6))
+
+# future options
+future::plan(future::multisession(workers = 4))
+options(future.globals.maxSize = 1000 * 1024 ^ 2)
 
 ## Create output directories:
 hw_output_dir <- "out/heatwave_summaries"
