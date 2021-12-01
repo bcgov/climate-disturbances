@@ -265,6 +265,8 @@ make_stars_cube <- function(files, variable) {
 
   stars_proxy_obj <- stars::read_stars(files,
                           proxy = TRUE,
+                          # cannot supply a list of dimensions to 'along' for proxy objects,
+                          # so must do it after the fact
                           # along = list(time = as.Date(names(model_list)))
                           along = "time"
   )
