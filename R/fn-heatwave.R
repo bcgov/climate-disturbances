@@ -325,9 +325,9 @@ generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
 
   # Long data frame of tmax for every pixel for every date
   all_temps <- as.data.frame(stars_cube) |>
+    dplyr::filter(!is.na(tmax)) |> # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
     dplyr::mutate(time = as.Date(time)) |>
     dplyr::rename(t = time, temp = tmax) |>
-    dplyr::filter(!is.na(temp)) |> # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
     dplyr::mutate(pixel_id = paste(x, y, sep = ";"))
 
   all_temps_split <- split(all_temps, all_temps$pixel_id)
