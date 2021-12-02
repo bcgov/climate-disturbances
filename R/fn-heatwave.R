@@ -40,7 +40,7 @@ extract_ahccd_data <- function(zipfile, save_raw_txt = FALSE, data_dir) {
   ret
 }
 
-read_ahccd_data_single <- function(datafile) {
+read_ahccd_data_single <- function(datafile, n_max = Inf) {
 
   txt <- readLines(datafile, n = 3)
 
@@ -65,7 +65,8 @@ read_ahccd_data_single <- function(datafile) {
     datafile,
     col_positions = readr::fwf_widths(c(6, 3, rep(8, 31)), col_names = header),
     na = c("-9999.9", "-9999.9M"), skip = 4,
-    col_types = paste0("ii", paste0(rep("c", 31), collapse = ""))
+    col_types = paste0("ii", paste0(rep("c", 31), collapse = "")),
+    n_max = n_max
   )
 
   for (i in seq_along(stn_meta)) {
@@ -103,11 +104,17 @@ read_ahccd_data_single <- function(datafile) {
     temp = ifelse(temp < -9000, NA_real_, temp)
   )
 
-  data |>
+  data <- data |>
     dplyr::select(stn_id, stn_name, measure, date, year = Year,
                   month = Mo, temp, dplyr::everything(),
                   -DoM) |>
     dplyr::filter(!is.na(date)) # Remove invalid dates
+
+  if (!is.infinite(n_max)) {
+    return(head(data, n = n_max))
+  }
+
+  data
 }
 
 write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
@@ -134,15 +141,12 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
 
   con <- duckdb_connect(duckdb_path, read_only = FALSE)
 
-  message("Writing duckdb database in ", duckdb_path,
-          " for ", length(fpaths[[1]]), " stations")
+  message("Writing data to table '", tbl_name, "' in '", duckdb_path,
+          "' duckdb database for ", length(fpaths[[1]]), " stations")
 
   DBI::dbCreateTable(con, tbl_name,
-                     fields = c(stn_id = "STRING", stn_name = "STRING", measure = "STRING",
-                                date = "DATE", year = "INTEGER", month = "INTEGER", temp = "DOUBLE",
-                                province = "STRING", stn_joined = "STRING", element = "STRING",
-                                unit = "STRING", stn_last_updated = "STRING", flag = "STRING"
-                     ))
+                     # get field names and types from the data we are about to read
+                     fields = read_ahccd_data_single(fpaths[[1]][1], n_max = 1))
 
   purrr::pwalk(fpaths, function(x, y, z) {
     d1 <- read_ahccd_data_single(x)
