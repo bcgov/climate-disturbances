@@ -37,7 +37,10 @@ Imports:
     raster,
     future,
     future.apply,
-    furrr
+    furrr,
+    DBI,
+    duckdb,
+    dbplyr
 License: Apache License (== 2.0) | file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

@@ -32,8 +32,12 @@ dir.create("data", showWarnings = FALSE)
 ## Source functions
 r_files <- list.files("R", pattern = "*.R", full.names = TRUE)
 dump <- lapply(r_files, source, echo = FALSE, verbose = FALSE)
+
 if (.Platform$OS.type == "windows") options("arrow.use_threads" = FALSE)
-future::plan(future::multisession(workers = 6))
+
+# future options
+future::plan(future::multisession(workers = 4))
+options(future.globals.maxSize = 1000 * 1024 ^ 2)
 
 ## Create output directories:
 hw_output_dir <- "out/heatwave_summaries"
@@ -84,7 +88,7 @@ climate_targets <- list(
     format = "file"
   ),
   tar_target(
-    ahccd_parquet_path,
+    ahccd_duckdb_path,
     write_ahccd_data(ahccd_zipfiles),
     format = "file"
   ),
@@ -94,25 +98,26 @@ climate_targets <- list(
                                     buffer = 200, # Buffer in Km
                                     crs = sf::st_crs(dem))),
   tar_target(dem, get_dem(res = raster_res)),
-  tar_target(analysis_temps, arrow::open_dataset(ahccd_parquet_path) %>%
-               dplyr::filter(date >= start_date, date <= end_date,
-                      stn_id %in% target_stations$stn_id,
-                      measure %in% c("daily_max", "daily_min")) %>%
-               dplyr::collect()),
+  tar_target(analysis_temps, {
+    on.exit(duckdb::duckdb_shutdown(duckdb::duckdb()))
+    ahccd_tbl(ahccd_duckdb_path) %>%
+      dplyr::filter(date >= start_date, date <= end_date,
+                    stn_id %in% local(target_stations$stn_id),
+                    measure %in% c("daily_max", "daily_min")) %>%
+      dplyr::collect()
+    }),
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = dplyr::filter(analysis_temps, measure == "daily_max"),
                                            stations = target_stations,
                                            months = 1:12, future.seed = 13L)),
-  tar_target(daily_temps_stars_cube,
-             interpolate_daily_temps(daily_tmax_models,
-                                     dem[area_of_interest], "tmax")),
-  tar_target(out_ncdf, write_ncdf(daily_temps_stars_cube,
-                                  path = paste0("out/data/daily_temps_",
-                                                start_date, "-", end_date, ".nc")),
-                                  format = "file")
+  tar_target(model_output_tifs, interpolate_daily_temps(daily_tmax_models,
+                                                        dem, "tmax",
+                                                        path = paste0("out/data/daily_temps/")),
+             format = "file"),
+  tar_target(daily_temps_stars_cube, make_stars_cube(model_output_tifs, "tmax"))
 )
 
 heatwave_targets <- list(
-  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube,
+  tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube[area_of_interest],
                                                        start_date = start_date,
                                                        end_date = end_date)),
   tar_target(pixel_aoi_lup, pixel_aoi_lookup(daily_temps_stars_cube, area_of_interest,

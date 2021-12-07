@@ -40,7 +40,7 @@ extract_ahccd_data <- function(zipfile, save_raw_txt = FALSE, data_dir) {
   ret
 }
 
-read_ahccd_data_single <- function(datafile) {
+read_ahccd_data_single <- function(datafile, n_max = Inf) {
 
   txt <- readLines(datafile, n = 3)
 
@@ -65,7 +65,8 @@ read_ahccd_data_single <- function(datafile) {
     datafile,
     col_positions = readr::fwf_widths(c(6, 3, rep(8, 31)), col_names = header),
     na = c("-9999.9", "-9999.9M"), skip = 4,
-    col_types = paste0("ii", paste0(rep("c", 31), collapse = ""))
+    col_types = paste0("ii", paste0(rep("c", 31), collapse = "")),
+    n_max = n_max
   )
 
   for (i in seq_along(stn_meta)) {
@@ -103,15 +104,21 @@ read_ahccd_data_single <- function(datafile) {
     temp = ifelse(temp < -9000, NA_real_, temp)
   )
 
-  data |>
+  data <- data |>
     dplyr::select(stn_id, stn_name, measure, date, year = Year,
                   month = Mo, temp, dplyr::everything(),
                   -DoM) |>
     dplyr::filter(!is.na(date)) # Remove invalid dates
+
+  if (!is.infinite(n_max)) {
+    return(head(data, n = n_max))
+  }
+
+  data
 }
 
 write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
-                             data_dir = "data") {
+                             data_dir = "data", tbl_name = "ahccd_data") {
 
   stopifnot(length(zipfiles) == 3L)
   stopifnot(all(file.exists(zipfiles)))
@@ -123,32 +130,39 @@ write_ahccd_data <- function(zipfiles, save_raw_txt = FALSE,
 
   data_dir <- normalizePath(data_dir, mustWork = TRUE)
 
-  parquet_path <- file.path(data_dir, "AHCCD_data", "parquet")
+  duckdb_path <- file.path(data_dir, "AHCCD_data", "duckdb", "ahccd.duckdb")
 
-  if (dir.exists(parquet_path)) {
-    del <- unlink(parquet_path, recursive = TRUE, force = TRUE)
-    if (!del) stop("unable to delete existing directory: ", parquet_path)
+  if (file.exists(duckdb_path)) {
+    del <- unlink(duckdb_path, recursive = TRUE, force = TRUE)
+    if (!del) stop("unable to delete existing database: ", duckdb_path)
   }
 
-  dir.create(parquet_path, recursive = TRUE, showWarnings = FALSE)
+  dir.create(dirname(duckdb_path), recursive = TRUE, showWarnings = FALSE)
 
-  message("Writing parquet files in ", parquet_path, "for ", length(fpaths[[1]]),
-          " stations, partitioning by stn_id, year, and measure")
+  con <- duckdb_connect(duckdb_path, read_only = FALSE)
 
+  message("Writing data to table '", tbl_name, "' in '", duckdb_path,
+          "' duckdb database for ", length(fpaths[[1]]), " stations")
 
-  # this could be done in parallel
-  furrr::future_pwalk(fpaths, function(x, y, z) {
+  DBI::dbCreateTable(con, tbl_name,
+                     # get field names and types from the data we are about to read
+                     fields = read_ahccd_data_single(fpaths[[1]][1], n_max = 1))
+
+  purrr::pwalk(fpaths, function(x, y, z) {
     d1 <- read_ahccd_data_single(x)
     d2 <- read_ahccd_data_single(y)
     d3 <- read_ahccd_data_single(z)
 
     d <- dplyr::bind_rows(d1, d2, d3)
-    d <- dplyr::group_by(d, stn_id, year, measure)
-    arrow::write_dataset(d, parquet_path, format = "parquet")
+    DBI::dbAppendTable(conn = con, name = tbl_name, value = d)
   })
 
-  attr(parquet_path, "timestamp") <- as.character(Sys.time())
-  parquet_path
+  purrr::walk(c("stn_id", "measure", "date", "year", "month"), \(x) {
+    add_sql_index(con, colname = x)
+  })
+
+  attr(duckdb_path, "timestamp") <- as.character(Sys.time())
+  duckdb_path
 }
 
 get_ahccd_stations <- function() {
@@ -235,32 +249,54 @@ temp_tps <- function(df) {
   fields::Tps(x = indep, Y = df$temp, miles = FALSE)
 }
 
-interpolate_daily_temps <- function(model_list, dem, variable) {
-  stars_list <- future.apply::future_lapply(model_list, function(mod) {
-    predict(dem, mod)
+interpolate_daily_temps <- function(model_list, dem, variable, path) {
+
+  dir <- file.path(path, variable)
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+
+  out_files <- future.apply::future_lapply(names(model_list), function(x) {
+    mod <- model_list[[x]]
+    pred <- predict(dem, mod)
+    fname <- file.path(dir, paste0(x, ".tif"))
+    stars::write_stars(pred, fname)
+    fname
   }, future.packages = c("fields", "stars"))
 
-  dates <- as.Date(names(model_list))
-
-  stars_cube <- do.call("c", stars_list)
-  stars_cube <- stars::st_redimension(stars_cube, along = list(time = dates))
-  names(stars_cube) <- variable
-  stars_cube
+  unlist(out_files)
 }
 
-write_ncdf <- function(cube, path) {
-  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+make_stars_cube <- function(files, variable) {
 
-  out_rast <- stars:::st_as_raster(cube, "Raster")
+  stars_proxy_obj <- stars::read_stars(files,
+                          proxy = TRUE,
+                          # cannot supply a list of dimensions to 'along' for proxy objects,
+                          # so must do it after the fact
+                          # along = list(time = as.Date(names(model_list)))
+                          along = "time"
+  )
 
-  # Write as netcdf
-  raster::writeRaster(out_rast, path, format = "CDF",
-              xname = "x", yname = "y",
-              varname = "temp", varunit = "degC",
-              zname = "time", zunit = "days",
-              overwrite = TRUE)
-  path
+  names(stars_proxy_obj) <- variable
+
+  stars_fnames <- names(stars_proxy_obj[[variable]])
+  dates <- as.Date(gsub(".*(\\d{4}-\\d{2}-\\d{2})\\.tif", "\\1", stars_fnames))
+
+  stars_proxy_obj <- stars::st_set_dimensions(stars_proxy_obj, "time", dates)
+  stars_proxy_obj
 }
+
+# write_ncdf <- function(cube, path) {
+#   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+#
+#   out_rast <- stars:::st_as_raster(cube, "Raster")
+#
+#   # Write as netcdf
+#   raster::writeRaster(out_rast, path, format = "CDF",
+#               xname = "x", yname = "y",
+#               varname = "temp", varunit = "degC",
+#               zname = "time", zunit = "days",
+#               overwrite = TRUE)
+#   path
+# }
 
 ##### Heatwave detection
 
@@ -273,9 +309,10 @@ write_ncdf <- function(cube, path) {
 #' @return list of climatologies (outputs of heatwaveR::ts2clm);
 #' one element for each pixel
 generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
-  not_na_pixels <- !is.na(stars_cube$tmax)
   # Check each time period has the same number of pixels (3 is the time dimension)
-  num_pixels_per_slice <- apply(not_na_pixels, 3, sum)
+  not_na <- stars::st_apply(stars_cube, "time", \(x) sum(!is.na(x)))
+
+  num_pixels_per_slice <- stars::st_as_stars(not_na)$tmax
   targets::tar_assert_identical(min(num_pixels_per_slice), max(num_pixels_per_slice))
   num_pixels <- min(num_pixels_per_slice)
 
@@ -288,9 +325,9 @@ generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
 
   # Long data frame of tmax for every pixel for every date
   all_temps <- as.data.frame(stars_cube) |>
+    dplyr::filter(!is.na(tmax)) |> # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
     dplyr::mutate(time = as.Date(time)) |>
     dplyr::rename(t = time, temp = tmax) |>
-    dplyr::filter(!is.na(temp)) |> # This assumes that each pixel either has a complete time series, or all temps are NA. I think this is reasonable
     dplyr::mutate(pixel_id = paste(x, y, sep = ";"))
 
   all_temps_split <- split(all_temps, all_temps$pixel_id)
@@ -312,9 +349,9 @@ generate_pixel_climatologies <- function(stars_cube, start_date, end_date) {
 #' @param area_of_interest sf polygons
 #'
 #' @return tibble with x, y, pixel_id (concatenation of x & y),
-#' LOCAL_HLTH_AREA_CODE, LOCAL_HLTH_AREA_NAME
+#' and variables supplied in `group_vars`
 pixel_aoi_lookup <- function(stars_cube, area_of_interest, group_vars) {
-  rast <- dplyr::slice(stars_cube, "time", 1)
+  rast <- dplyr::slice(stars_cube[area_of_interest], "time", 1)
   as.data.frame(rast) |>
     dplyr::select(-tmax) |>
     dplyr::mutate(pixel_id = paste(x, y, sep = ";")) |>
@@ -403,3 +440,19 @@ detect_aoi_events <- function(aoi_clim_summary, aoi_field, minDuration = 2) {
     })
 }
 
+duckdb_connect <- function(db_path, read_only = TRUE) {
+  DBI::dbConnect(duckdb::duckdb(), db_path, read_only = read_only)
+}
+
+add_sql_index <- function(con, tbl = "ahccd_data", colname,
+                          idxname = paste0(tolower(colname), "_idx")) {
+  sql_str <- sprintf("CREATE INDEX %s ON %s(%s)", idxname, tbl, colname)
+  DBI::dbExecute(con, sql_str)
+  invisible(NULL)
+}
+
+ahccd_tbl <- function(db_path, tbl = "ahccd_data") {
+  con <- duckdb_connect(db_path, read_only = TRUE)
+  # on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+  dplyr::tbl(con, tbl)
+}
