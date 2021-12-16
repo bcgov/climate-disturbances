@@ -16,7 +16,9 @@ library(targets)
 library(tarchetypes)
 # Read the documentation for tar_script() for help: Run ?tar_script to see the help file
 
-tar_option_set(packages = desc::desc_get_deps()$package)
+deps <- desc::desc_get_deps()[["package"]]
+tar_option_set(packages = deps)
+
 ## Folders
 dir.create("data", showWarnings = FALSE)
 
