@@ -73,7 +73,7 @@ read_ahccd_data_single <- function(datafile, n_max = Inf) {
     data[[names(stn_meta)[i]]] <- unname(stn_meta[i])
   }
 
-  data <- tidyr::pivot_longer(data, cols = starts_with("Day"),
+  data <- tidyr::pivot_longer(data, cols = dplyr::starts_with("Day"),
                               names_to = "DoM", values_to = "temp")
 
   # Check for undocumented flags:
@@ -196,7 +196,7 @@ get_ahccd_stations <- function() {
 #' @return sf object containing stations of interest
 #' @export
 get_bc_target_stations <- function(stations, buffer, crs) {
-  bc_buff <- sf::st_buffer(st_union(bcmaps::bc_bound()), dist = buffer * 1000)
+  bc_buff <- sf::st_buffer(sf::st_union(bcmaps::bc_bound()), dist = buffer * 1000)
   stations <- sf::st_transform(stations, sf::st_crs(bc_buff))
   stations <- sf::st_intersection(stations, bc_buff, sparse = FALSE)
   sf::st_transform(stations, crs)
@@ -397,7 +397,7 @@ summarize_aoi_clims <- function(event_clims, aoi_pixel_lookup, group_vars) {
   # summarize climatology stats by AOI by date.
   event_clims |>
     dplyr::left_join(sf::st_drop_geometry(aoi_pixel_lookup), by = "pixel_id") |>
-    dplyr::group_by(across({{group_vars}})) |>
+    dplyr::group_by(dplyr::across({{group_vars}})) |>
     dplyr::summarise(
       dplyr::across(.cols = c(temp, seas, thresh),
                     .fns = list(mean = mean, median = median, max = max, sd = sd),
