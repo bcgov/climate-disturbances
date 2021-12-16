@@ -14,7 +14,7 @@ Authors@R: c(
            comment = c(ORCID = "0000-0002-9270-7884")),
     person("Province of British Columbia", role = "cph")
   )
-Description: What the package does (one paragraph).
+Description: Generates event data for various extreme climate-related events. Current focus is on heatwaves.
 Imports:
     targets,
     tarchetypes,
