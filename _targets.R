@@ -137,6 +137,12 @@ heatwave_targets <- list(
 
 output_targets <- list(
   tar_target(
+    lha_clim_by_date_csv,
+    write_csv_output(aoi_clim_summary,
+                     file.path(hw_output_dir, "lha_climes_by_date.csv")),
+    format = "file"
+  ),
+  tar_target(
     lha_events_by_date_csv,
     write_csv_output(aoi_events_by_date,
                      file.path(hw_output_dir, "lha_events_by_date.csv")),
@@ -152,9 +158,9 @@ output_targets <- list(
 
 # health sites
 health_facilities <- list(
-  tar_target(hospitals, bcdc_query_geodata("bc-health-care-facilities-hospital") %>%
-               filter(INTERSECTS(area_of_interest)) %>%
-               collect())
+  # tar_target(hospitals, bcdc_query_geodata("bc-health-care-facilities-hospital") %>%
+  #              filter(INTERSECTS(area_of_interest)) %>%
+  #              collect())
 )
 
 
@@ -164,9 +170,7 @@ health_facilities <- list(
     # tar_target(pm25_24h, pm25_data %>%
     #              rename(date_time = date_pst) %>%
     #              distinct() %>%
-    #              pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name"))),
-    tar_target(heatwaves_raw, detect_heatwave(weather_data, pctile = 95, minDuration = 3)),
-    tar_target(heatwaves, bind_heatwave_data(heatwaves_raw))
+    #              pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
   )
 
   # Output ------------------------------------------------------------------
