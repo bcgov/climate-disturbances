@@ -376,7 +376,7 @@ events_clim_daily <- function(clims_list, minDuration = 2, ...) {
   }, ...)
 
   # extract daily event stats and combine to table
-  future_lapply(names(events_list), \(x) {
+  future.apply::future_lapply(names(events_list), \(x) {
     event <- events_list[[x]]$climatology
     event$pixel_id <- x
     event[c("pixel_id", setdiff(names(event), "pixel_id"))] |>
