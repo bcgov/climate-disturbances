@@ -41,7 +41,7 @@ Heatwave detection is implemented using Open Government Licence - Canada data re
 - daily gridded temperature surfaces are saved in `out/data/daily_temps` as `.tif` files
 
 
-### Air Quality
+### Air Quality (currently on hold)
 
 The air quality data are sourced from the [B.C. Data Catalogue](https://catalogue.data.gov.bc.ca/dataset/air-quality-monitoring-verified-hourly-data), provided under the Open Government Licence&mdash;British Columbia (this file: ftp://ftp.env.gov.bc.ca/pub/outgoing/AIR/AnnualSummary/2009-LatestVerified/PM25.csv)
 
