@@ -139,7 +139,8 @@ output_targets <- list(
   tar_target(
     lha_clim_by_date_csv,
     write_csv_output(aoi_clim_summary,
-                     file.path(hw_output_dir, "lha_climes_by_date.csv")),
+                     file.path(hw_output_dir, "lha_climes_by_date.csv"),
+                     split = "LOCAL_HLTH_AREA_CODE"),
     format = "file"
   ),
   tar_target(

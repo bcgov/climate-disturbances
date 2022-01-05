@@ -18,7 +18,21 @@ ask <- function(...) {
   utils::menu(choices) == which(choices == "Yes")
 }
 
-write_csv_output <- function(x, path, ...) {
-  readr::write_csv(x, file = path, na = "")
-  path
+write_csv_output <- function(x, path, split = NULL) {
+  if (is.null(split)) {
+    readr::write_csv(x, file = path, na = "")
+    return(path)
+  }
+
+  if (!split %in% names(x)) {
+    stop(split, " is not a column in the data frame", call. = FALSE)
+  }
+
+  x_list <- split(x, x[[split]])
+  x_paths <- file.path(dirname(path), paste(names(x_list), basename(path), sep = "_"))
+
+  purrr::walk2(x_list, x_paths, ~ {
+    readr::write_csv(x = .x, file = .y, na = "")
+  })
+  x_paths
 }
