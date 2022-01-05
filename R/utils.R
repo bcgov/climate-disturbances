@@ -19,6 +19,8 @@ ask <- function(...) {
 }
 
 write_csv_output <- function(x, path, split = NULL) {
+
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   if (is.null(split)) {
     readr::write_csv(x, file = path, na = "")
     return(path)

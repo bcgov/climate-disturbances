@@ -130,6 +130,7 @@ heatwave_targets <- list(
   tar_target(aoi_events, detect_aoi_events(aoi_clim_summary, aoi_field = "LOCAL_HLTH_AREA_CODE")),
   tar_target(aoi_events_by_date, lapply(aoi_events, `[[`, "climatology") |>
                dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE") |>
+               dplyr::left_join(aoi_clim_summary, by = c("LOCAL_HLTH_AREA_CODE", "t"))|>
                dplyr::rename(date = t)),
   tar_target(aoi_events_summary, lapply(aoi_events, `[[`, "event") |>
                dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE"))
@@ -137,18 +138,18 @@ heatwave_targets <- list(
 
 output_targets <- list(
   tar_target(
-    lha_clim_by_date_csv,
-    write_csv_output(aoi_clim_summary,
-                     file.path(hw_output_dir, "lha_climes_by_date.csv"),
+    lha_clim_events_by_date_csv,
+    write_csv_output(aoi_events_by_date, file.path(hw_output_dir, "lha_clims_events",
+                                                   "lha_clim_events_by_date.csv"),
                      split = "LOCAL_HLTH_AREA_CODE"),
     format = "file"
   ),
-  tar_target(
-    lha_events_by_date_csv,
-    write_csv_output(aoi_events_by_date,
-                     file.path(hw_output_dir, "lha_events_by_date.csv")),
-    format = "file"
-  ),
+  # tar_target(
+  #   lha_events |> _by_date_csv,
+  #   write_csv_output(aoi_events_by_date,
+  #                    file.path(hw_output_dir, "lha_events_by_date.csv")),
+  #   format = "file"
+  # ),
   tar_target(
     lha_events_summary_csv,
     write_csv_output(aoi_events_summary,
