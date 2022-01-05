@@ -144,12 +144,6 @@ output_targets <- list(
                      split = "LOCAL_HLTH_AREA_CODE"),
     format = "file"
   ),
-  # tar_target(
-  #   lha_events |> _by_date_csv,
-  #   write_csv_output(aoi_events_by_date,
-  #                    file.path(hw_output_dir, "lha_events_by_date.csv")),
-  #   format = "file"
-  # ),
   tar_target(
     lha_events_summary_csv,
     write_csv_output(aoi_events_summary,
