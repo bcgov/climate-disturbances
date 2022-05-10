@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
-
 library(targets)
 library(tarchetypes)
 # Read the documentation for tar_script() for help: Run ?tar_script to see the help file
@@ -24,11 +23,11 @@ dir.create("data", showWarnings = FALSE)
 
 
 ## To debug a target set the target:
-      # tar_option_set(debug = "area_of_interest")
+# tar_option_set(debug = "area_of_interest")
 ## and run:
-     # tar_make(callr_function = NULL)
+# tar_make(callr_function = NULL)
 ##  You can do:
-     # tar_make(names = "area_of_interest", shortcut = TRUE, callr_function = NULL)
+# tar_make(names = "area_of_interest", shortcut = TRUE, callr_function = NULL)
 ##  to only run the target of interest and skip checking upstream targets
 
 ## Source functions
@@ -107,10 +106,10 @@ climate_targets <- list(
                     stn_id %in% local(target_stations$stn_id),
                     measure %in% c("daily_max", "daily_min")) %>%
       dplyr::collect()
-    }),
+  }),
   tar_target(daily_tmax_models, model_temps_xyz(temp_data = dplyr::filter(analysis_temps, measure == "daily_max"),
-                                           stations = target_stations,
-                                           months = 1:12, future.seed = 13L)),
+                                                stations = target_stations,
+                                                months = 1:12, future.seed = 13L)),
   tar_target(model_output_tifs, interpolate_daily_temps(daily_tmax_models,
                                                         dem, "tmax",
                                                         path = paste0("out/data/daily_temps/")),
@@ -119,6 +118,18 @@ climate_targets <- list(
 )
 
 heatwave_targets <- list(
+  tar_target(station_clims, {
+    temps <- filter(analysis_temps, measure == "daily_max") |> rename(t = date)
+    temps_split <- split(temps, temps$stn_id)
+    clims <- future.apply::future_lapply(temps_split, \(x) try(heatwaveR::ts2clm(x,
+                                climatologyPeriod = c(max(min(x$t), start_date), min(max(x$t), end_date)),
+                                )), future.seed = 13L)
+    Filter(is.data.frame, clims)
+  }),
+  tar_target(station_heatwaves,
+             future.apply::future_lapply(station_clims, heatwaveR::detect_event, minDuration = 2,
+                                         future.seed = TRUE)
+  ),
   tar_target(pixel_clims, generate_pixel_climatologies(daily_temps_stars_cube[area_of_interest],
                                                        start_date = start_date,
                                                        end_date = end_date)),
@@ -133,7 +144,11 @@ heatwave_targets <- list(
                dplyr::left_join(aoi_clim_summary, by = c("LOCAL_HLTH_AREA_CODE", "t"))|>
                dplyr::rename(date = t)),
   tar_target(aoi_events_summary, lapply(aoi_events, `[[`, "event") |>
-               dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE"))
+               dplyr::bind_rows(.id = "LOCAL_HLTH_AREA_CODE")),
+  tar_target(station_events_summary, lapply(station_heatwaves, `[[`, "event") |>
+               dplyr::bind_rows(.id = "station_id")),
+  tar_target(station_event_details, lapply(station_heatwaves, `[[`, "climatology") |>
+               dplyr::bind_rows(.id = "station_id"))
 )
 
 output_targets <- list(
@@ -160,32 +175,32 @@ health_facilities <- list(
 )
 
 
-  # tidy --------------------------------------------------------------------
+# tidy --------------------------------------------------------------------
 
-  processing_targets <- list(
-    # tar_target(pm25_24h, pm25_data %>%
-    #              rename(date_time = date_pst) %>%
-    #              distinct() %>%
-    #              pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
-  )
+processing_targets <- list(
+  # tar_target(pm25_24h, pm25_data %>%
+  #              rename(date_time = date_pst) %>%
+  #              distinct() %>%
+  #              pm_24h_caaqs(val = "raw_value", by = c("station_name", "ems_id", "instrument", "local_hlth_area_name", "hlth_service_dlvr_area_name")))
+)
 
-  # Output ------------------------------------------------------------------
+# Output ------------------------------------------------------------------
 
 
-  ## Pipeline
+## Pipeline
 
-  list(
-    static_vars,
-    climate_targets,
-    heatwave_targets,
-    output_targets,
-    # processing_targets,
-    # health_facilities,
-    #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
-    # tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
-    # tar_render(heatwave_overview, "out/heatwave-overview.Rmd"),
-    #tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
-    NULL
-  )
+list(
+  static_vars,
+  climate_targets,
+  heatwave_targets,
+  output_targets,
+  # processing_targets,
+  # health_facilities,
+  #tar_render(clim_overview, "out/climate-disturbance-overview.Rmd"),
+  # tar_render(flood_examples, "out/flood-examples/flood-examples.Rmd"),
+  # tar_render(heatwave_overview, "out/heatwave-overview.Rmd"),
+  #tar_render(air_quality_examples, "out/air-quality-examples/air-quality-examples.Rmd")
+  NULL
+)
 
 
