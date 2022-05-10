@@ -31,7 +31,7 @@ aoi_percent_increase_n <- ((max(aoi_n_mod_pred$predicted) - min(aoi_n_mod_pred$p
                        max(aoi_n_mod_pred$predicted)) * 100
 
 ggplot() +
-geom_point(aes(x = year_n, y = n), alpha =  0.5, data = events_by_year,
+geom_point(aes(x = year_n, y = n), alpha =  0.5, data = aoi_events_by_year,
            position = position_jitter(width = 1, height = 0),
            colour = viridisLite::viridis(5)[3]) +
   geom_line(aes(x, predicted), data = aoi_n_mod_pred, colour = viridisLite::viridis(1),
@@ -63,7 +63,7 @@ percent_increase <- ((max(aoi_int_mixed_pred$predicted) - min(aoi_int_mixed_pred
 ggplot() +
   geom_point(aes(x = year, y = intensity_max), alpha = 0.3, data = aoi_events_summary,
              colour = viridisLite::viridis(5)[3]) +
-  geom_line(aes(x, predicted), data = int_mixed_pred,
+  geom_line(aes(x, predicted), data = aoi_int_mixed_pred,
             colour = viridisLite::viridis(1), size = 1) +
   geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high),
               alpha = 0.1, fill = viridisLite::viridis(1),
@@ -84,13 +84,19 @@ station_events_summary <- station_events_summary |>
          year_n = year - min(year))
 
 station_events_by_year <- station_events_summary |>
-  group_by(LOCAL_HLTH_AREA_CODE, year, year_n) |>
+  group_by(station_id, year, year_n) |>
   tally()
 
-stn_events_mixed_mod <- glmmTMB(n ~ year_n + (1 | LOCAL_HLTH_AREA_CODE),
+stn_events_mixed_mod_int <- glmmTMB(n ~ year_n + (year_n | station_id),
+                 data = station_events_by_year,
+                 family = poisson())
+summary(stn_events_mixed_mod_int)
+stn_events_mixed_mod <- glmmTMB(n ~ year_n + (1 | station_id),
                  data = station_events_by_year,
                  family = poisson())
 summary(stn_events_mixed_mod)
+
+AIC(stn_events_mixed_mod, stn_events_mixed_mod_int)
 
 stn_events_mixed_mod_pred <- ggpredict(stn_events_mixed_mod, terms = "year_n")
 plot(stn_events_mixed_mod_pred, add.data = TRUE)
@@ -117,8 +123,7 @@ ggplot() +
     caption = "Each point is a single LHA in a single year"
   )
 
-
-intensity_stn_mixed_mod <- glmmTMB(intensity_max ~ year + (1 | LOCAL_HLTH_AREA_CODE),
+intensity_stn_mixed_mod <- glmmTMB(intensity_max ~ year + (1 | station_id),
                       data = station_events_summary)
 summary(intensity_stn_mixed_mod)
 
