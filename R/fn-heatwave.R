@@ -12,10 +12,11 @@
 
 ########### Create temperature surfaces
 
-download_ahccd_data <- function(data_dir = "data") {
+download_ahccd_data <- function(data_dir = "data", year = 2020) {
   base_url <- "https://crd-data-donnees-rdc.ec.gc.ca/CDAS/products/EC_data/AHCCD_daily"
   files_df <- rvest::html_table(rvest::read_html(base_url))[[1]]
-  which_file <- grepl("daily_max_temp|daily_mean_temp|daily_min_temp", files_df$Name) & grepl("2020", files_df$Name) & tools::file_ext(files_df$Name) == "zip"
+  which_file <- grepl("daily_max_temp|daily_mean_temp|daily_min_temp", files_df$Name) &
+    grepl(as.character(year), files_df$Name) & tools::file_ext(files_df$Name) == "zip"
   fname <- files_df$Name[which_file]
 
   data_dir <- normalizePath(file.path(data_dir, "ahccd_sources"), mustWork = FALSE)

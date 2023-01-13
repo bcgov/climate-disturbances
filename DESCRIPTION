@@ -40,7 +40,9 @@ Imports:
     furrr,
     DBI,
     duckdb,
-    dbplyr
+    dbplyr,
+    weathercan,
+    devtools
 License: Apache License (== 2.0) | file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
